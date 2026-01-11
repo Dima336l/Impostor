@@ -73,27 +73,38 @@ stateDiagram-v2
 ### Requirements
 
 - Unity 2021.3 LTS or newer
-- Steamworks SDK (from Steamworks partner portal)
-- Steamworks.NET or Facepunch.Steamworks package
+- Steam installed and running (for testing)
+- Steamworks.NET package (optional for initial testing)
 - TextMeshPro (included with Unity)
 
-### Setup
+### Getting Started
 
-1. **Install Packages**
-   - Import TextMeshPro (Window > TextMeshPro > Import TMP Essential Resources)
-   - Install Steamworks.NET or Facepunch.Steamworks
+1. **Open Project in Unity**
+   - Open Unity Hub → Add project → Select Impostor folder
+   - Wait for Unity to import assets
 
-2. **Steamworks SDK**
-   - Copy `steam_api*.dll/dylib/so` files to `Assets/Plugins/`
-   - Create `steam_appid.txt` in project root (use `480` for testing)
+2. **Install TextMeshPro**
+   - Window > TextMeshPro > Import TMP Essential Resources
 
-3. **Scenes & Prefabs**
-   - Create scenes: `MainMenu`, `Lobby`, `GameTable`
-   - Create prefabs: `PlayerAvatar`, `LobbyPlayerSlot`, `VoteButton`, `ClueItem`
-   - Tag table GameObject as "Table" in GameTable scene
+3. **Set Up Steam for Testing**
+   - Create `steam_appid.txt` in project root (same level as `Assets` folder)
+   - Add the number `480` to the file (Spacewar test app ID)
+   - **Important:** Steam must be running before testing!
 
-4. **Build Settings**
-   - Add scenes: MainMenu (0), Lobby (1), GameTable (2)
+4. **Create Scenes** (see detailed guide below)
+   - MainMenu, Lobby, GameTable scenes
+   - Add Canvas and UI elements
+   - Attach UI scripts and assign references
+
+5. **Add Manager GameObjects**
+   - Create empty GameObjects in MainMenu scene
+   - Add components: SteamManager, SteamLobbyManager, NetworkManager, GameManager, WordManager
+
+6. **Press Play!**
+   - Ensure Steam is running
+   - Check Console for "Steam initialized successfully"
+
+**📖 For detailed step-by-step instructions, see [QUICK_START.md](QUICK_START.md)**
 
 ## Project Structure
 

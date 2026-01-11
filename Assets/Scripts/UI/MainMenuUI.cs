@@ -88,7 +88,7 @@ namespace Impostor.UI
             SetButtonsInteractable(false);
             ShowLoading(true);
 
-            SteamLobbyManager.Instance.CreateLobby(Steamworks.ELobbyType.k_ELobbyTypeFriendsOnly, 6);
+            SteamLobbyManager.Instance.CreateLobby(2, 6); // 2 = k_ELobbyTypeFriendsOnly
         }
 
         private void JoinLobby()

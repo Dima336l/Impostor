@@ -101,7 +101,8 @@ namespace Impostor.Steam
             }
         }
 
-        public void CreateLobby(ELobbyType lobbyType = ELobbyType.k_ELobbyTypeFriendsOnly, int maxMembers = 6)
+        // Lobby type constants: 0 = Private, 1 = FriendsOnly, 2 = Public, 3 = Invisible
+        public void CreateLobby(int lobbyType = 1, int maxMembers = 6) // 1 = FriendsOnly
         {
             if (!SteamManager.Instance.IsInitialized)
             {
