@@ -1,3 +1,7 @@
+// NOTE: This file requires Steamworks.NET to be imported into Unity.
+// It will not compile until Steamworks.NET package is added to the project.
+// Download from: https://github.com/rlabrecque/Steamworks.NET/releases
+
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -7,6 +11,7 @@ namespace Impostor.Steam
 {
     /// <summary>
     /// Manages Steam lobby creation, joining, and player management.
+    /// REQUIRES: Steamworks.NET package to be imported.
     /// </summary>
     public class SteamLobbyManager : MonoBehaviour
     {

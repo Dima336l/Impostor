@@ -1,21 +1,22 @@
 using System;
-using Steamworks;
+using UnityEngine;
 
 namespace Impostor.Networking
 {
     /// <summary>
     /// Represents a networked player with their Steam ID and game state.
+    /// Uses ulong for SteamID to avoid requiring Steamworks types at compile time.
     /// </summary>
     [Serializable]
     public class NetworkPlayer
     {
-        public CSteamID SteamID { get; set; }
+        public ulong SteamID { get; set; }
         public string PlayerName { get; set; }
         public bool IsReady { get; set; }
         public bool IsConnected { get; set; }
         public int PlayerIndex { get; set; }
 
-        public NetworkPlayer(CSteamID steamID, string playerName)
+        public NetworkPlayer(ulong steamID, string playerName)
         {
             SteamID = steamID;
             PlayerName = playerName;

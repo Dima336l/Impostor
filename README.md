@@ -73,8 +73,8 @@ stateDiagram-v2
 ### Requirements
 
 - Unity 2021.3 LTS or newer
+- **Steamworks.NET package** (REQUIRED - download from [GitHub](https://github.com/rlabrecque/Steamworks.NET/releases))
 - Steam installed and running (for testing)
-- Steamworks.NET package (optional for initial testing)
 - TextMeshPro (included with Unity)
 
 ### Getting Started
@@ -83,28 +83,36 @@ stateDiagram-v2
    - Open Unity Hub → Add project → Select Impostor folder
    - Wait for Unity to import assets
 
-2. **Install TextMeshPro**
+2. **Import Steamworks.NET** (REQUIRED)
+   - Download from: https://github.com/rlabrecque/Steamworks.NET/releases
+   - In Unity: `Assets > Import Package > Custom Package`
+   - Select the downloaded `.unitypackage`
+   - Import all files
+   - **This fixes all compilation errors**
+
+3. **Install TextMeshPro**
    - Window > TextMeshPro > Import TMP Essential Resources
 
-3. **Set Up Steam for Testing**
+4. **Set Up Steam for Testing**
    - Create `steam_appid.txt` in project root (same level as `Assets` folder)
    - Add the number `480` to the file (Spacewar test app ID)
    - **Important:** Steam must be running before testing!
 
-4. **Create Scenes** (see detailed guide below)
+5. **Create Scenes** (see [QUICK_START.md](QUICK_START.md))
    - MainMenu, Lobby, GameTable scenes
    - Add Canvas and UI elements
    - Attach UI scripts and assign references
 
-5. **Add Manager GameObjects**
+6. **Add Manager GameObjects**
    - Create empty GameObjects in MainMenu scene
    - Add components: SteamManager, SteamLobbyManager, NetworkManager, GameManager, WordManager
 
-6. **Press Play!**
+7. **Press Play!**
    - Ensure Steam is running
    - Check Console for "Steam initialized successfully"
 
-**📖 For detailed step-by-step instructions, see [QUICK_START.md](QUICK_START.md)**
+**📖 For detailed setup instructions, see [QUICK_START.md](QUICK_START.md)**  
+**📖 For Steam-specific setup, see [STEAM_SETUP.md](STEAM_SETUP.md)**
 
 ## Project Structure
 
