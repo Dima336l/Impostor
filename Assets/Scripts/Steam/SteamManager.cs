@@ -72,6 +72,7 @@ namespace Impostor.Steam
         {
             try
             {
+                Debug.Log("Attempting to initialize Steam...");
                 if (SteamAPI.Init())
                 {
                     _isInitialized = true;
@@ -84,11 +85,13 @@ namespace Impostor.Steam
                 else
                 {
                     Debug.LogError("Steam initialization failed. Make sure Steam is running and you have a valid App ID.");
+                    Debug.LogError("Check: 1) Steam client is running, 2) You're logged in, 3) steam_appid.txt exists with '480'");
                 }
             }
             catch (Exception e)
             {
                 Debug.LogError($"Steam initialization exception: {e.Message}");
+                Debug.LogError($"Exception details: {e}");
             }
         }
 

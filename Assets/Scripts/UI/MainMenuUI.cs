@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Steamworks;
 using Impostor.Steam;
 using Impostor.Game;
 
@@ -26,6 +27,12 @@ namespace Impostor.UI
             if (Impostor.Steam.SteamManager.Instance != null)
             {
                 Impostor.Steam.SteamManager.Instance.OnSteamInitialized += OnSteamInitialized;
+                
+                // Check if Steam is already initialized (in case it initialized before we subscribed)
+                if (Impostor.Steam.SteamManager.Instance.IsInitialized)
+                {
+                    OnSteamInitialized();
+                }
             }
 
             if (SteamLobbyManager.Instance != null)
@@ -124,6 +131,11 @@ namespace Impostor.UI
 
         private void QuitGame()
         {
+            Debug.Log("Quitting game...");
+            
+            // Clean up Steam before quitting (let SteamManager handle it)
+            // SteamManager.OnDestroy will handle SteamAPI.Shutdown()
+            
             Application.Quit();
             
             #if UNITY_EDITOR
