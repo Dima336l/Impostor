@@ -50,13 +50,13 @@ namespace Impostor.Steam
 
         private void OnEnable()
         {
-            if (SteamManager.Instance.IsInitialized)
+            if (Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 RegisterCallbacks();
             }
             else
             {
-                SteamManager.Instance.OnSteamInitialized += RegisterCallbacks;
+                Impostor.Steam.SteamManager.Instance.OnSteamInitialized += RegisterCallbacks;
             }
         }
 
@@ -67,7 +67,7 @@ namespace Impostor.Steam
 
         private void Update()
         {
-            if (!SteamManager.Instance.IsInitialized) return;
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized) return;
 
             ReceiveMessages();
         }
@@ -87,7 +87,7 @@ namespace Impostor.Steam
 
         public void ConnectToPlayer(CSteamID targetSteamID)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 Debug.LogError("Steam not initialized. Cannot connect.");
                 return;
@@ -136,16 +136,29 @@ namespace Impostor.Steam
                 return;
             }
 
-            EResult result = SteamNetworkingSockets.SendMessageToConnection(
-                connection,
-                data,
-                (uint)data.Length,
-                (int)ESteamNetworkingSendFlags.k_nSteamNetworkingSend_Reliable,
-                out _);
-
-            if (result != EResult.k_EResultOK)
+            const int k_nSteamNetworkingSend_Reliable = 8;
+            
+            // Pin the byte array and get IntPtr
+            System.Runtime.InteropServices.GCHandle handle = System.Runtime.InteropServices.GCHandle.Alloc(data, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
             {
-                Debug.LogError($"Failed to send message to {targetSteamID}. Error: {result}");
+                IntPtr pData = handle.AddrOfPinnedObject();
+                long messageNumber;
+                EResult result = SteamNetworkingSockets.SendMessageToConnection(
+                    connection,
+                    pData,
+                    (uint)data.Length,
+                    k_nSteamNetworkingSend_Reliable,
+                    out messageNumber);
+
+                if (result != EResult.k_EResultOK)
+                {
+                    Debug.LogError($"Failed to send message to {targetSteamID}. Error: {result}");
+                }
+            }
+            finally
+            {
+                handle.Free();
             }
         }
 
@@ -231,7 +244,7 @@ namespace Impostor.Steam
 
         public void InitializeConnections(List<CSteamID> lobbyMembers)
         {
-            CSteamID localID = SteamManager.Instance.LocalSteamID;
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
 
             foreach (CSteamID memberID in lobbyMembers)
             {

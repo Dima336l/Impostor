@@ -63,13 +63,13 @@ namespace Impostor.Steam
 
         private void OnEnable()
         {
-            if (SteamManager.Instance.IsInitialized)
+            if (Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 RegisterCallbacks();
             }
             else
             {
-                SteamManager.Instance.OnSteamInitialized += RegisterCallbacks;
+                Impostor.Steam.SteamManager.Instance.OnSteamInitialized += RegisterCallbacks;
             }
         }
 
@@ -106,10 +106,10 @@ namespace Impostor.Steam
             }
         }
 
-        // Lobby type constants: 0 = Private, 1 = FriendsOnly, 2 = Public, 3 = Invisible
-        public void CreateLobby(int lobbyType = 1, int maxMembers = 6) // 1 = FriendsOnly
+        // Lobby type: 0 = Private, 1 = FriendsOnly, 2 = Public, 3 = Invisible
+        public void CreateLobby(ELobbyType lobbyType = ELobbyType.k_ELobbyTypeFriendsOnly, int maxMembers = 6)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 Debug.LogError("Steam not initialized. Cannot create lobby.");
                 return;
@@ -121,7 +121,7 @@ namespace Impostor.Steam
 
         public void JoinLobby(CSteamID lobbyID)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 Debug.LogError("Steam not initialized. Cannot join lobby.");
                 return;
@@ -233,7 +233,7 @@ namespace Impostor.Steam
         {
             if (!_currentLobbyID.IsValid()) return false;
             CSteamID ownerID = SteamMatchmaking.GetLobbyOwner(_currentLobbyID);
-            return ownerID == SteamManager.Instance.LocalSteamID;
+            return ownerID == Impostor.Steam.SteamManager.Instance.LocalSteamID;
         }
     }
 }

@@ -5,6 +5,7 @@ using TMPro;
 using Steamworks;
 using Impostor.Steam;
 using Impostor.Game;
+using Impostor.Networking;
 
 namespace Impostor.UI
 {
@@ -142,7 +143,7 @@ namespace Impostor.UI
             if (nameText != null)
             {
                 string playerName = SteamLobbyManager.Instance.GetPlayerName(steamID);
-                if (steamID == SteamManager.Instance.LocalSteamID)
+                if (steamID == Impostor.Steam.SteamManager.Instance.LocalSteamID)
                 {
                     playerName += " (You)";
                 }

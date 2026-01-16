@@ -21,7 +21,7 @@ namespace Impostor.Camera
         [SerializeField] private Transform tableCenter;
         [SerializeField] private float distanceFromTable = 0.5f;
 
-        private Camera _camera;
+        private UnityEngine.Camera _camera;
         private float _verticalRotation = 0f;
         private float _horizontalRotation = 0f;
         private Vector3 _targetPosition;
@@ -29,10 +29,10 @@ namespace Impostor.Camera
 
         private void Awake()
         {
-            _camera = GetComponent<Camera>();
+            _camera = GetComponent<UnityEngine.Camera>();
             if (_camera == null)
             {
-                _camera = gameObject.AddComponent<Camera>();
+                _camera = gameObject.AddComponent<UnityEngine.Camera>();
             }
 
             // Set up camera defaults

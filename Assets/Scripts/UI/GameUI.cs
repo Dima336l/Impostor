@@ -5,6 +5,7 @@ using TMPro;
 using Steamworks;
 using Impostor.Game;
 using Impostor.Steam;
+using Impostor.Networking;
 
 namespace Impostor.UI
 {
@@ -139,7 +140,7 @@ namespace Impostor.UI
         {
             if (message is WordAssignedMessage wordMsg)
             {
-                CSteamID localID = SteamManager.Instance.LocalSteamID;
+                CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
                 if (wordMsg.PlayerSteamID == localID.m_SteamID)
                 {
                     _localSecretWord = wordMsg.Word;
@@ -197,7 +198,7 @@ namespace Impostor.UI
             }
 
             CSteamID currentPlayer = roundManager.CurrentPlayer;
-            CSteamID localID = SteamManager.Instance.LocalSteamID;
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
 
             if (currentPlayerText != null)
             {
@@ -280,7 +281,7 @@ namespace Impostor.UI
                 return;
             }
 
-            CSteamID localID = SteamManager.Instance.LocalSteamID;
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
 
             if (GameManager.Instance.IsHost)
             {
@@ -313,7 +314,7 @@ namespace Impostor.UI
                 return false;
             }
 
-            CSteamID localID = SteamManager.Instance.LocalSteamID;
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
             return roundManager.CurrentPlayer == localID;
         }
 

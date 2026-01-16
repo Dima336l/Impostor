@@ -18,10 +18,10 @@ namespace Impostor.Game
         {
             get
             {
-                if (_instance == null)
-                {
-                    _instance = FindObjectOfType<VoteManager>();
-                }
+            if (_instance == null)
+            {
+                _instance = FindFirstObjectByType<VoteManager>();
+            }
                 return _instance;
             }
         }

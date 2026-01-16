@@ -45,7 +45,7 @@ namespace Impostor.Steam
 
         public void UnlockAchievement(string achievementID)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 Debug.LogWarning("Steam not initialized. Cannot unlock achievement.");
                 return;
@@ -90,7 +90,7 @@ namespace Impostor.Steam
 
         public bool IsAchievementUnlocked(string achievementID)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 return false;
             }

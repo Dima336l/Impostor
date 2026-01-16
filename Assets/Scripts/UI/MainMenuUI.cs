@@ -23,9 +23,9 @@ namespace Impostor.UI
             InitializeUI();
 
             // Subscribe to Steam events
-            if (SteamManager.Instance != null)
+            if (Impostor.Steam.SteamManager.Instance != null)
             {
-                SteamManager.Instance.OnSteamInitialized += OnSteamInitialized;
+                Impostor.Steam.SteamManager.Instance.OnSteamInitialized += OnSteamInitialized;
             }
 
             if (SteamLobbyManager.Instance != null)
@@ -37,9 +37,9 @@ namespace Impostor.UI
 
         private void OnDestroy()
         {
-            if (SteamManager.Instance != null)
+            if (Impostor.Steam.SteamManager.Instance != null)
             {
-                SteamManager.Instance.OnSteamInitialized -= OnSteamInitialized;
+                Impostor.Steam.SteamManager.Instance.OnSteamInitialized -= OnSteamInitialized;
             }
 
             if (SteamLobbyManager.Instance != null)
@@ -78,7 +78,7 @@ namespace Impostor.UI
 
         private void CreateLobby()
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 UpdateStatus("Steam not initialized. Please wait...");
                 return;
@@ -88,12 +88,12 @@ namespace Impostor.UI
             SetButtonsInteractable(false);
             ShowLoading(true);
 
-            SteamLobbyManager.Instance.CreateLobby(2, 6); // 2 = k_ELobbyTypeFriendsOnly
+            SteamLobbyManager.Instance.CreateLobby(Steamworks.ELobbyType.k_ELobbyTypeFriendsOnly, 6);
         }
 
         private void JoinLobby()
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 UpdateStatus("Steam not initialized. Please wait...");
                 return;

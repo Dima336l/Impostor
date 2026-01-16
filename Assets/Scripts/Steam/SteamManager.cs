@@ -92,7 +92,7 @@ namespace Impostor.Steam
             }
         }
 
-        public bool RestartAppIfNecessary(uint unOwnAppID)
+        public bool RestartAppIfNecessary(AppId_t unOwnAppID)
         {
             return SteamAPI.RestartAppIfNecessary(unOwnAppID);
         }

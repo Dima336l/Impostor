@@ -326,7 +326,7 @@ namespace Impostor.Game
             // Unlock achievements
             if (SteamAchievements.Instance != null)
             {
-                CSteamID localID = SteamManager.Instance.LocalSteamID;
+                CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
                 bool isLocalImpostor = impostors.Contains(localID);
 
                 if (!impostorsWon && !isLocalImpostor)
@@ -419,13 +419,13 @@ namespace Impostor.Game
         {
             ReadyStateMessage message = new ReadyStateMessage
             {
-                PlayerSteamID = SteamManager.Instance.LocalSteamID.m_SteamID,
+                PlayerSteamID = Impostor.Steam.SteamManager.Instance.LocalSteamID.m_SteamID,
                 IsReady = ready
             };
 
             if (_isHost)
             {
-                _playerManager.SetReady(SteamManager.Instance.LocalSteamID, ready);
+                _playerManager.SetReady(Impostor.Steam.SteamManager.Instance.LocalSteamID, ready);
                 CheckAllPlayersReady();
             }
             else

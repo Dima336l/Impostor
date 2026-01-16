@@ -5,6 +5,7 @@ using TMPro;
 using Steamworks;
 using Impostor.Game;
 using Impostor.Steam;
+using Impostor.Networking;
 
 namespace Impostor.UI
 {
@@ -149,7 +150,7 @@ namespace Impostor.UI
                 return;
             }
 
-            CSteamID localID = SteamManager.Instance.LocalSteamID;
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
 
             // Create button for each player (except self)
             foreach (CSteamID playerID in GameManager.Instance.PlayerManager.AllPlayers)
@@ -200,7 +201,7 @@ namespace Impostor.UI
                 return;
             }
 
-            CSteamID localID = SteamManager.Instance.LocalSteamID;
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
 
             if (GameManager.Instance.IsHost)
             {

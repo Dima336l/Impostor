@@ -46,17 +46,17 @@ namespace Impostor.Networking
 
         private void OnEnable()
         {
-            if (SteamNetworking.Instance != null)
+            if (Impostor.Steam.SteamNetworking.Instance != null)
             {
-                SteamNetworking.Instance.OnMessageReceived += HandleSteamMessage;
+                Impostor.Steam.SteamNetworking.Instance.OnMessageReceived += HandleSteamMessage;
             }
         }
 
         private void OnDisable()
         {
-            if (SteamNetworking.Instance != null)
+            if (Impostor.Steam.SteamNetworking.Instance != null)
             {
-                SteamNetworking.Instance.OnMessageReceived -= HandleSteamMessage;
+                Impostor.Steam.SteamNetworking.Instance.OnMessageReceived -= HandleSteamMessage;
             }
         }
 
@@ -82,26 +82,26 @@ namespace Impostor.Networking
 
         public void SendMessage(NetworkMessage message, CSteamID targetSteamID)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 Debug.LogWarning("Steam not initialized. Cannot send message.");
                 return;
             }
 
             byte[] data = message.Serialize();
-            SteamNetworking.Instance.SendMessageToPlayer(targetSteamID, data);
+            Impostor.Steam.SteamNetworking.Instance.SendMessageToPlayer(targetSteamID, data);
         }
 
         public void BroadcastMessage(NetworkMessage message, CSteamID excludeSteamID = default)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 Debug.LogWarning("Steam not initialized. Cannot broadcast message.");
                 return;
             }
 
             byte[] data = message.Serialize();
-            SteamNetworking.Instance.BroadcastMessage(data, excludeSteamID);
+            Impostor.Steam.SteamNetworking.Instance.BroadcastMessage(data, excludeSteamID);
         }
 
         private void HandleSteamMessage(CSteamID senderID, byte[] data, int size)
@@ -130,13 +130,13 @@ namespace Impostor.Networking
             if (SteamLobbyManager.Instance.IsInLobby)
             {
                 List<CSteamID> members = SteamLobbyManager.Instance.LobbyMembers;
-                SteamNetworking.Instance.InitializeConnections(members);
+                Impostor.Steam.SteamNetworking.Instance.InitializeConnections(members);
             }
         }
 
         public void DisconnectAll()
         {
-            SteamNetworking.Instance.CloseAllConnections();
+            Impostor.Steam.SteamNetworking.Instance.CloseAllConnections();
         }
     }
 }

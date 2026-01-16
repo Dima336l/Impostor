@@ -18,10 +18,10 @@ namespace Impostor.Game
         {
             get
             {
-                if (_instance == null)
-                {
-                    _instance = FindObjectOfType<RoundManager>();
-                }
+            if (_instance == null)
+            {
+                _instance = FindFirstObjectByType<RoundManager>();
+            }
                 return _instance;
             }
         }
@@ -62,7 +62,7 @@ namespace Impostor.Game
             _gameManager = GetComponent<GameManager>();
             if (_gameManager == null)
             {
-                _gameManager = FindObjectOfType<GameManager>();
+                _gameManager = FindFirstObjectByType<GameManager>();
             }
         }
 

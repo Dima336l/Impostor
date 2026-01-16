@@ -37,7 +37,7 @@ namespace Impostor.Steam
 
         public void SetStatus(string status)
         {
-            if (!SteamManager.Instance.IsInitialized)
+            if (!Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 return;
             }
@@ -67,7 +67,7 @@ namespace Impostor.Steam
 
         public void ClearStatus()
         {
-            if (SteamManager.Instance.IsInitialized)
+            if (Impostor.Steam.SteamManager.Instance.IsInitialized)
             {
                 SteamFriends.ClearRichPresence();
             }
