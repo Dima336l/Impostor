@@ -39,6 +39,9 @@ namespace Impostor.UI
 
                 SteamLobbyManager.Instance.OnPlayerJoined += OnPlayerJoined;
                 SteamLobbyManager.Instance.OnPlayerLeft += OnPlayerLeft;
+                
+                // Sync existing lobby members with GameManager
+                SyncLobbyMembersToGameManager();
             }
 
             if (GameManager.Instance != null)
@@ -48,6 +51,26 @@ namespace Impostor.UI
             }
 
             RefreshPlayerList();
+        }
+        
+        private void SyncLobbyMembersToGameManager()
+        {
+            if (SteamLobbyManager.Instance == null || GameManager.Instance == null)
+                return;
+                
+            if (!SteamLobbyManager.Instance.IsInLobby)
+                return;
+                
+            // Add all existing lobby members to GameManager
+            List<CSteamID> members = SteamLobbyManager.Instance.LobbyMembers;
+            foreach (CSteamID memberID in members)
+            {
+                if (!GameManager.Instance.PlayerManager.HasPlayer(memberID))
+                {
+                    string playerName = SteamLobbyManager.Instance.GetPlayerName(memberID);
+                    GameManager.Instance.PlayerManager.AddPlayer(memberID, playerName);
+                }
+            }
         }
 
         private void OnDestroy()
