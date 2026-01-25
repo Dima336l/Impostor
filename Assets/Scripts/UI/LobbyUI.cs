@@ -237,6 +237,9 @@ namespace Impostor.UI
             {
                 GameManager.Instance.StartGame();
             }
+
+            // Transition to game scene
+            UnityEngine.SceneManagement.SceneManager.LoadScene("GameTable");
         }
 
         private void LeaveLobby()
