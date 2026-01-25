@@ -11,5 +11,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Lobby.unity
     guid: 9e8784a7ee8b9ee4a85a6786dcba70dd
+  - enabled: 1
+    path: Assets/Scenes/GameTable.unity
+    guid: b761a26ff23d0a34fab2acfa89525a2d
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
