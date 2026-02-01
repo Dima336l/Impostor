@@ -212,7 +212,7 @@ namespace Impostor.Game
         {
             if (_isHost && _voteManager != null)
             {
-                _voteManager.StartVoting(60f);
+                _voteManager.StartVoting(5f);
             }
 
             if (SteamRichPresence.Instance != null)

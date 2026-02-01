@@ -33,6 +33,10 @@ namespace Impostor.UI
         [Header("Timer")]
         [SerializeField] private TextMeshProUGUI timerText;
         [SerializeField] private Slider timerSlider;
+        
+        private float _clueTimer = 0f;
+        private float _clueTimeLimit = 5f;
+        private bool _clueTimerActive = false;
 
         private string _localSecretWord = "";
         private bool _isImpostor = false;
@@ -121,19 +125,99 @@ namespace Impostor.UI
         {
             UpdateRoundDisplay(roundNumber);
             ClearClues();
+            
+            // Reset timer
+            _clueTimerActive = false;
+            _clueTimer = 0f;
+            
+            // Ensure clue container is visible
+            if (clueListContainer != null)
+            {
+                clueListContainer.gameObject.SetActive(true);
+                Debug.Log("Clue container is now visible");
+            }
+            
+            // Check if it's local player's turn to start
+            if (IsMyTurn())
+            {
+                StartClueTimer();
+            }
         }
 
         private void OnClueSubmitted(CSteamID playerID, string clue)
         {
+            Debug.Log($"OnClueSubmitted called: Player={playerID}, Clue={clue}");
             AddClueDisplay(playerID, clue);
             UpdateTurnIndicator();
-            SetClueInputEnabled(IsMyTurn());
+            
+            // Reset clue timer
+            _clueTimerActive = false;
+            _clueTimer = 0f;
+            
+            // Check if it's now local player's turn
+            bool isMyTurn = IsMyTurn();
+            SetClueInputEnabled(isMyTurn);
+            
+            if (isMyTurn)
+            {
+                // Start 5-second timer for local player
+                StartClueTimer();
+            }
+        }
+        
+        private void StartClueTimer()
+        {
+            _clueTimer = _clueTimeLimit;
+            _clueTimerActive = true;
+            UpdateClueTimer();
+        }
+        
+        private void UpdateClueTimer()
+        {
+            if (timerText != null && _clueTimerActive)
+            {
+                int seconds = Mathf.CeilToInt(_clueTimer);
+                timerText.text = $"Time: {seconds}s";
+                
+                if (timerSlider != null)
+                {
+                    timerSlider.value = _clueTimer / _clueTimeLimit;
+                }
+            }
         }
 
         private void OnAllCluesSubmitted()
         {
             SetClueInputEnabled(false);
             UpdateStatus("All clues submitted! Moving to voting...");
+            
+            // Ensure all clues are displayed in the left panel
+            RefreshAllClues();
+            
+            // Voting should start automatically via GameManager.OnAllCluesSubmitted
+            Debug.Log("All clues submitted - voting phase should start automatically");
+        }
+        
+        private void RefreshAllClues()
+        {
+            if (GameManager.Instance == null || GameManager.Instance.RoundManager == null)
+            {
+                return;
+            }
+            
+            // Get all clues from RoundManager
+            var allClues = GameManager.Instance.RoundManager.GetAllClues();
+            
+            Debug.Log($"Refreshing clue display - {allClues.Count} clues total");
+            
+            // Clear existing display
+            ClearClues();
+            
+            // Add all clues to the left panel
+            foreach (var kvp in allClues)
+            {
+                AddClueDisplay(kvp.Key, kvp.Value);
+            }
         }
 
         private void HandleWordAssigned(NetworkMessage message, CSteamID senderID)
@@ -155,6 +239,7 @@ namespace Impostor.UI
             if (message is ClueSubmittedMessage clueMsg)
             {
                 CSteamID playerID = new CSteamID(clueMsg.PlayerSteamID);
+                Debug.Log($"HandleClueSubmitted: Player={playerID}, Clue={clueMsg.Clue}");
                 AddClueDisplay(playerID, clueMsg.Clue);
             }
         }
@@ -209,7 +294,23 @@ namespace Impostor.UI
                 }
                 else if (currentPlayer.IsValid())
                 {
-                    string playerName = SteamLobbyManager.Instance.GetPlayerName(currentPlayer);
+                    // Get player name from PlayerManager first (works for dummy players)
+                    string playerName = "Unknown";
+                    if (GameManager.Instance.PlayerManager != null)
+                    {
+                        var playerData = GameManager.Instance.PlayerManager.GetPlayer(currentPlayer);
+                        if (playerData != null)
+                        {
+                            playerName = playerData.PlayerName;
+                        }
+                    }
+                    
+                    // Fallback to SteamLobbyManager if not found
+                    if (playerName == "Unknown" && SteamLobbyManager.Instance != null)
+                    {
+                        playerName = SteamLobbyManager.Instance.GetPlayerName(currentPlayer);
+                    }
+                    
                     currentPlayerText.text = $"{playerName}'s Turn";
                     currentPlayerText.color = Color.white;
                 }
@@ -223,25 +324,109 @@ namespace Impostor.UI
 
         private void AddClueDisplay(CSteamID playerID, string clue)
         {
-            if (clueListContainer == null || clueItemPrefab == null)
+            // Fallback: try to find container by name if reference is missing
+            if (clueListContainer == null)
             {
+                GameObject containerObj = GameObject.Find("ClueListContainer");
+                if (containerObj != null)
+                {
+                    clueListContainer = containerObj.transform;
+                    Debug.Log("Found ClueListContainer by name");
+                }
+                else
+                {
+                    Debug.LogError("clueListContainer is null and couldn't find by name! Cannot display clue.");
+                    return;
+                }
+            }
+            
+            if (clueItemPrefab == null)
+            {
+                Debug.LogError("clueItemPrefab is null! Cannot display clue.");
                 return;
+            }
+            
+            // Ensure container is active and visible
+            if (!clueListContainer.gameObject.activeSelf)
+            {
+                clueListContainer.gameObject.SetActive(true);
+                Debug.Log("Activated ClueListContainer");
+            }
+
+            // Get player name from PlayerManager first, then SteamLobbyManager
+            string playerName = "Unknown";
+            if (GameManager.Instance != null && GameManager.Instance.PlayerManager != null)
+            {
+                var playerData = GameManager.Instance.PlayerManager.GetPlayer(playerID);
+                if (playerData != null)
+                {
+                    playerName = playerData.PlayerName;
+                }
+            }
+            
+            if (playerName == "Unknown" && SteamLobbyManager.Instance != null)
+            {
+                playerName = SteamLobbyManager.Instance.GetPlayerName(playerID);
             }
 
             // Remove existing clue if player already submitted
             if (_clueItems.TryGetValue(playerID, out GameObject existingItem))
             {
-                Destroy(existingItem);
+                if (existingItem != null)
+                {
+                    Destroy(existingItem);
+                }
+                _clueItems.Remove(playerID);
             }
 
+            // Instantiate clue item
             GameObject clueItem = Instantiate(clueItemPrefab, clueListContainer);
             _clueItems[playerID] = clueItem;
+            
+            // Ensure it's active and visible
+            clueItem.SetActive(true);
+            
+            // Set RectTransform for proper layout
+            RectTransform clueRect = clueItem.GetComponent<RectTransform>();
+            if (clueRect != null)
+            {
+                clueRect.localScale = Vector3.one;
+                clueRect.anchoredPosition = Vector2.zero;
+            }
 
+            // Set the clue text
             TextMeshProUGUI clueText = clueItem.GetComponentInChildren<TextMeshProUGUI>();
             if (clueText != null)
             {
-                string playerName = SteamLobbyManager.Instance.GetPlayerName(playerID);
                 clueText.text = $"{playerName}: {clue}";
+                clueText.color = Color.white; // Ensure text is white and visible
+                Debug.Log($"✓ Added clue to left panel: {playerName}: {clue}");
+            }
+            else
+            {
+                Debug.LogWarning($"ClueItem prefab doesn't have TextMeshProUGUI component!");
+            }
+            
+            // Make sure the clue item GameObject is visible
+            if (clueItem != null)
+            {
+                clueItem.SetActive(true);
+                clueItem.hideFlags = HideFlags.None;
+            }
+            
+            // Force layout update
+            Canvas.ForceUpdateCanvases();
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(clueListContainer as RectTransform);
+            
+            // Log detailed info
+            Debug.Log($"✓✓✓ Clue display added: {playerName}: {clue}");
+            Debug.Log($"   Container: {clueListContainer.name}, Active: {clueListContainer.gameObject.activeSelf}, Children: {clueListContainer.childCount}");
+            Debug.Log($"   ClueItem active: {clueItem.activeSelf}, Position: {clueRect?.anchoredPosition}");
+            
+            // Ensure parent (WorldPanel) is also visible
+            if (clueListContainer.parent != null)
+            {
+                clueListContainer.parent.gameObject.SetActive(true);
             }
         }
 
@@ -348,6 +533,49 @@ namespace Impostor.UI
         private void Update()
         {
             UpdateTurnIndicator();
+            
+            // Continuously check if it's local player's turn and enable/disable input
+            if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameManager.GameState.InGame)
+            {
+                bool isMyTurn = IsMyTurn();
+                SetClueInputEnabled(isMyTurn);
+                
+                // Update clue timer
+                if (isMyTurn && _clueTimerActive)
+                {
+                    _clueTimer -= Time.deltaTime;
+                    if (_clueTimer <= 0f)
+                    {
+                        _clueTimer = 0f;
+                        _clueTimerActive = false;
+                        // Auto-submit if timer runs out and input is empty
+                        if (clueInputField != null && string.IsNullOrEmpty(clueInputField.text.Trim()))
+                        {
+                            // Generate a default clue
+                            string defaultClue = "clue";
+                            if (GameManager.Instance.RoundManager != null)
+                            {
+                                var playerData = GameManager.Instance.PlayerManager?.GetPlayer(Impostor.Steam.SteamManager.Instance.LocalSteamID);
+                                if (playerData != null && playerData.Role == PlayerRole.Civilian)
+                                {
+                                    defaultClue = GameManager.Instance.RoundManager.CurrentSecretWord.Substring(0, Mathf.Min(3, GameManager.Instance.RoundManager.CurrentSecretWord.Length));
+                                }
+                            }
+                            clueInputField.text = defaultClue;
+                            SubmitClue();
+                        }
+                    }
+                    UpdateClueTimer();
+                }
+                else if (!isMyTurn)
+                {
+                    _clueTimerActive = false;
+                    if (timerText != null)
+                    {
+                        timerText.text = "";
+                    }
+                }
+            }
 
             // Update timer if voting
             if (GameManager.Instance != null && 
@@ -361,7 +589,7 @@ namespace Impostor.UI
                 }
                 if (timerSlider != null)
                 {
-                    timerSlider.value = timeRemaining / 60f;
+                    timerSlider.value = timeRemaining / 5f; // 5 second voting timer
                 }
             }
         }

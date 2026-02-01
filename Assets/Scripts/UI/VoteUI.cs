@@ -22,10 +22,19 @@ namespace Impostor.UI
         [SerializeField] private Button noVoteButton;
         [SerializeField] private TextMeshProUGUI votingStatusText;
         [SerializeField] private TextMeshProUGUI voteCountText;
+        [SerializeField] private TextMeshProUGUI votingTimerText;
+        
+        [Header("Results UI")]
+        [SerializeField] private GameObject resultsPanel;
+        [SerializeField] private TextMeshProUGUI resultsTitleText;
+        [SerializeField] private TextMeshProUGUI resultsOutcomeText;
+        [SerializeField] private TextMeshProUGUI resultsVoteCountsText;
+        [SerializeField] private Button continueButton;
 
         private Dictionary<CSteamID, GameObject> _voteButtons = new Dictionary<CSteamID, GameObject>();
         private CSteamID _selectedVote = CSteamID.Nil;
         private bool _hasVoted = false;
+        private VoteManager _voteManager;
 
         private void Start()
         {
@@ -43,17 +52,17 @@ namespace Impostor.UI
             }
 
             // Get VoteManager from GameManager
-            VoteManager voteManager = null;
+            _voteManager = null;
             if (GameManager.Instance != null)
             {
-                voteManager = GameManager.Instance.VoteManager;
+                _voteManager = GameManager.Instance.VoteManager;
             }
 
-            if (voteManager != null)
+            if (_voteManager != null)
             {
-                voteManager.OnVotingStarted += OnVotingStarted;
-                voteManager.OnVoteCast += OnVoteCast;
-                voteManager.OnVotingEnded += OnVotingEnded;
+                _voteManager.OnVotingStarted += OnVotingStarted;
+                _voteManager.OnVoteCast += OnVoteCast;
+                _voteManager.OnVotingEnded += OnVotingEnded;
             }
 
             if (NetworkManager.Instance != null)
@@ -112,20 +121,153 @@ namespace Impostor.UI
             _selectedVote = CSteamID.Nil;
             CreateVoteButtons();
             UpdateVotingStatus("Vote for who you think is the Impostor!");
+            
+            // Hide results panel if visible
+            if (resultsPanel != null)
+            {
+                resultsPanel.SetActive(false);
+            }
+        }
+        
+        private void Update()
+        {
+            // Update voting timer
+            if (_voteManager != null && _voteManager.VotingInProgress && votingTimerText != null)
+            {
+                float timeRemaining = _voteManager.VotingTimeRemaining;
+                int seconds = Mathf.CeilToInt(timeRemaining);
+                votingTimerText.text = $"Time: {seconds}s";
+                
+                // Update vote counts periodically
+                if (Time.frameCount % 30 == 0) // Every 30 frames (~0.5s at 60fps)
+                {
+                    UpdateVoteCounts();
+                }
+            }
         }
 
         private void OnVoteCast(CSteamID voterID, CSteamID targetID)
         {
+            Debug.Log($"Vote cast: {GetPlayerName(voterID)} voted for {GetPlayerName(targetID)}");
             UpdateVoteCounts();
         }
 
         private void OnVotingEnded(CSteamID votedOut, bool wasImpostor)
         {
-            string playerName = GetPlayerName(votedOut);
-            UpdateVotingStatus($"Voting ended! {playerName} was voted out. (Impostor: {wasImpostor})");
+            // Hide voting panel
+            SetVotePanelActive(false);
             
-            // Show results for a few seconds, then hide
-            Invoke(nameof(HideVotePanel), 5f);
+            // Show results
+            ShowVotingResults(votedOut, wasImpostor);
+        }
+        
+        private void ShowVotingResults(CSteamID votedOut, bool wasImpostor)
+        {
+            if (resultsPanel == null)
+            {
+                // Fallback: try to find by name
+                GameObject foundPanel = GameObject.Find("ResultsPanel");
+                if (foundPanel != null)
+                {
+                    resultsPanel = foundPanel;
+                }
+                else
+                {
+                    Debug.LogWarning("ResultsPanel not found. Showing results in voting status text.");
+                    string result = votedOut == CSteamID.Nil 
+                        ? "Vote resulted in a tie. No one was voted out." 
+                        : $"{GetPlayerName(votedOut)} was voted out. {(wasImpostor ? "They were the Impostor!" : "They were a Civilian.")}";
+                    UpdateVotingStatus(result);
+                    return;
+                }
+            }
+            
+            // Set results text
+            if (resultsTitleText != null)
+            {
+                resultsTitleText.text = "Voting Results";
+            }
+            
+            if (resultsOutcomeText != null)
+            {
+                if (votedOut == CSteamID.Nil)
+                {
+                    resultsOutcomeText.text = "Tie! No one was voted out.";
+                    resultsOutcomeText.color = Color.yellow;
+                }
+                else
+                {
+                    string playerName = GetPlayerName(votedOut);
+                    if (wasImpostor)
+                    {
+                        resultsOutcomeText.text = $"{playerName} was voted out.\nThey were the IMPOSTOR!";
+                        resultsOutcomeText.color = Color.green;
+                    }
+                    else
+                    {
+                        resultsOutcomeText.text = $"{playerName} was voted out.\nThey were a Civilian.";
+                        resultsOutcomeText.color = Color.red;
+                    }
+                }
+            }
+            
+            // Show vote counts
+            if (resultsVoteCountsText != null && _voteManager != null)
+            {
+                var voteCounts = _voteManager.GetVoteCounts();
+                string countsText = "Vote Counts:\n";
+                
+                if (voteCounts.Count == 0)
+                {
+                    countsText += "No votes cast.";
+                }
+                else
+                {
+                    foreach (var kvp in voteCounts)
+                    {
+                        countsText += $"{GetPlayerName(kvp.Key)}: {kvp.Value} vote(s)\n";
+                    }
+                }
+                
+                // Count "No Vote" votes
+                int noVoteCount = 0;
+                if (GameManager.Instance != null && GameManager.Instance.PlayerManager != null)
+                {
+                    foreach (var playerID in GameManager.Instance.PlayerManager.AllPlayers)
+                    {
+                        var vote = _voteManager.GetVote(playerID);
+                        if (vote == CSteamID.Nil)
+                        {
+                            noVoteCount++;
+                        }
+                    }
+                }
+                if (noVoteCount > 0)
+                {
+                    countsText += $"No Vote: {noVoteCount}";
+                }
+                
+                resultsVoteCountsText.text = countsText;
+            }
+            
+            // Setup continue button
+            if (continueButton != null)
+            {
+                continueButton.onClick.RemoveAllListeners();
+                continueButton.onClick.AddListener(() => {
+                    if (resultsPanel != null)
+                    {
+                        resultsPanel.SetActive(false);
+                    }
+                    // GameManager will handle next state transition
+                });
+            }
+            
+            // Show results panel
+            if (resultsPanel != null)
+            {
+                resultsPanel.SetActive(true);
+            }
         }
 
         private string GetPlayerName(CSteamID playerID)

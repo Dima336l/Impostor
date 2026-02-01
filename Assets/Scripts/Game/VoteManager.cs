@@ -30,7 +30,7 @@ namespace Impostor.Game
         private Dictionary<CSteamID, CSteamID> _votes = new Dictionary<CSteamID, CSteamID>(); // Voter -> Voted For
         private bool _votingInProgress = false;
         private float _votingTimer = 0f;
-        private float _votingDuration = 60f; // 60 seconds to vote
+        private float _votingDuration = 5f; // 5 seconds to vote (for testing)
 
         public bool VotingInProgress => _votingInProgress;
         public float VotingTimeRemaining => Mathf.Max(0f, _votingDuration - _votingTimer);
@@ -69,7 +69,7 @@ namespace Impostor.Game
             _playerManager = playerManager;
         }
 
-        public void StartVoting(float duration = 60f)
+        public void StartVoting(float duration = 5f)
         {
             if (_playerManager == null)
             {

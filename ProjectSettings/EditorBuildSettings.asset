@@ -9,10 +9,11 @@ EditorBuildSettings:
     path: Assets/Scenes/MainMenu.unity
     guid: 33f403133b9c23c42b435e62f6bbbb22
   - enabled: 1
-    path: Assets/Scenes/Lobby.unity
+    path: Assets/Scenes/Loading.unity
     guid: 9e8784a7ee8b9ee4a85a6786dcba70dd
   - enabled: 1
     path: Assets/Scenes/GameTable.unity
     guid: b761a26ff23d0a34fab2acfa89525a2d
-  m_configObjects: {}
+  m_configObjects:
+    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
   m_UseUCBPForAssetBundles: 0
