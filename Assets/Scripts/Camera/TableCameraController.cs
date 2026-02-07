@@ -43,20 +43,48 @@ namespace Impostor.Camera
 
         private void Start()
         {
+            FindTable();
+            InitializeCameraPosition();
+        }
+        
+        private void FindTable()
+        {
             if (tableCenter == null)
             {
                 GameObject tableObj = GameObject.FindGameObjectWithTag("Table");
                 if (tableObj != null)
                 {
                     tableCenter = tableObj.transform;
+                    Debug.Log("[TableCameraController] Found table by tag");
+                }
+                else
+                {
+                    // Try to get from TableSetup if available
+                    Impostor.Game.TableSetup tableSetup = FindFirstObjectByType<Impostor.Game.TableSetup>();
+                    if (tableSetup != null)
+                    {
+                        tableCenter = tableSetup.GetTableCenter();
+                        if (tableCenter != null)
+                        {
+                            Debug.Log("[TableCameraController] Found table from TableSetup");
+                        }
+                    }
                 }
             }
-
-            InitializeCameraPosition();
         }
-
+        
         private void Update()
         {
+            // Retry finding table if still null (in case TableSetup creates it later)
+            if (tableCenter == null && Time.frameCount % 60 == 0) // Check every 60 frames (once per second)
+            {
+                FindTable();
+                if (tableCenter != null)
+                {
+                    InitializeCameraPosition();
+                }
+            }
+            
             HandleMouseLook();
             UpdateCameraPosition();
         }

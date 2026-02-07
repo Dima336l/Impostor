@@ -305,8 +305,9 @@ namespace Impostor.Game
                 }
                 else
                 {
-                    // Start next round after delay
-                    Invoke(nameof(StartNextRound), 5f);
+                    // DISABLED: Don't auto-start next round - stay at round 1 for free roam
+                    // Invoke(nameof(StartNextRound), 5f);
+                    Debug.Log("[GameManager] Round 1 ended - staying in free roam mode (auto-round progression disabled)");
                 }
             }
         }

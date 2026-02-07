@@ -26,9 +26,16 @@ namespace Impostor.UI
         [SerializeField] private TMP_InputField clueInputField;
         [SerializeField] private Button submitClueButton;
 
-        [Header("Clue Display")]
-        [SerializeField] private Transform clueListContainer;
-        [SerializeField] private GameObject clueItemPrefab;
+        [Header("Clue Display - Dialogue Boxes")]
+        [SerializeField] private Transform tableCenter; // Table center transform for positioning
+        [SerializeField] private float tableRadius = 2f; // Distance from table center to player positions
+        [SerializeField] private float dialogueBoxHeight = 2.5f; // Height above player position (above head)
+        [SerializeField] private GameObject dialogueBoxPrefab; // Prefab for dialogue box (will create if null)
+        [SerializeField] private Canvas worldSpaceCanvas; // World space canvas for dialogue boxes
+        
+        [Header("Manual Text Setup (Optional)")]
+        [Tooltip("If you create text objects manually in Unity, assign them here. Leave empty to create automatically.")]
+        [SerializeField] private TextMeshProUGUI[] manualClueTexts; // Array of text objects (one per player, in player order)
 
         [Header("Timer")]
         [SerializeField] private TextMeshProUGUI timerText;
@@ -47,7 +54,8 @@ namespace Impostor.UI
 
         private string _localSecretWord = "";
         private bool _isImpostor = false;
-        private Dictionary<CSteamID, GameObject> _clueItems = new Dictionary<CSteamID, GameObject>();
+        private Dictionary<CSteamID, GameObject> _dialogueBoxes = new Dictionary<CSteamID, GameObject>(); // Dialogue boxes above players
+        private Dictionary<CSteamID, Vector3> _playerPositions = new Dictionary<CSteamID, Vector3>(); // Player positions around table
 
         private void Start()
         {
@@ -80,36 +88,8 @@ namespace Impostor.UI
                 }
             }
             
-            // Fallback: Find clue container and prefab by name if not assigned
-            if (clueListContainer == null)
-            {
-                GameObject containerObj = GameObject.Find("ClueListContainer");
-                if (containerObj != null)
-                {
-                    clueListContainer = containerObj.transform;
-                    Debug.Log("[GameUI] Found clueListContainer by name");
-                }
-                else
-                {
-                    Debug.LogError("[GameUI] clueListContainer not assigned and couldn't find by name!");
-                }
-            }
-            
-            if (clueItemPrefab == null)
-            {
-                // Try to find the prefab in Resources
-                clueItemPrefab = Resources.Load<GameObject>("Prefabs/UI/ClueItem");
-                if (clueItemPrefab != null)
-                {
-                    Debug.Log("[GameUI] Found clueItemPrefab in Resources");
-                }
-                else
-                {
-                    Debug.LogError("[GameUI] clueItemPrefab not assigned and couldn't find in Resources!");
-                }
-            }
-            
             InitializeUI();
+            InitializeDialogueBoxSystem();
 
             if (GameManager.Instance != null)
             {
@@ -285,12 +265,8 @@ namespace Impostor.UI
                 Debug.Log("[GameUI] Timer slider hidden");
             }
             
-            // Ensure clue container is visible
-            if (clueListContainer != null)
-            {
-                clueListContainer.gameObject.SetActive(true);
-                Debug.Log("Clue container is now visible");
-            }
+            // Calculate player positions around the table for dialogue boxes
+            CalculatePlayerPositions();
             
             // Get current player for logging
             CSteamID firstPlayer = CSteamID.Nil;
@@ -322,24 +298,11 @@ namespace Impostor.UI
         private void OnClueSubmitted(CSteamID playerID, string clue)
         {
             Debug.Log($"[GameUI] OnClueSubmitted called: Player={playerID}, Clue={clue}");
-            Debug.Log($"[GameUI] clueListContainer: {(clueListContainer != null ? clueListContainer.name : "NULL")}, clueItemPrefab: {(clueItemPrefab != null ? clueItemPrefab.name : "NULL")}");
             
-            // Always add clue display IMMEDIATELY - this ensures it appears in the left panel for ALL players
+            // Always add clue display IMMEDIATELY - this creates dialogue box above player
             // This is called for every player's clue submission (local and others)
             // Must be called synchronously to appear instantly
             AddClueDisplay(playerID, clue);
-            
-            // Force immediate UI update
-            Canvas.ForceUpdateCanvases();
-            if (clueListContainer != null)
-            {
-                UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(clueListContainer as RectTransform);
-                Debug.Log($"[GameUI] Forced layout rebuild - Container children: {clueListContainer.childCount}");
-            }
-            else
-            {
-                Debug.LogError("[GameUI] clueListContainer is NULL in OnClueSubmitted! Cannot update layout.");
-            }
             
             // Reset clue timer for the player who just submitted
             if (_currentTimerPlayer == playerID)
@@ -489,7 +452,7 @@ namespace Impostor.UI
                 AddClueDisplay(kvp.Key, kvp.Value);
             }
             
-            Debug.Log($"[GameUI] Finished refreshing clues - {_clueItems.Count} items in display");
+             Debug.Log($"[GameUI] Finished refreshing clues - {_dialogueBoxes.Count} dialogue boxes in display");
         }
 
         private void HandleWordAssigned(NetworkMessage message, CSteamID senderID)
@@ -601,70 +564,6 @@ namespace Impostor.UI
         {
             Debug.Log($"[GameUI] AddClueDisplay called: Player={playerID}, Clue={clue}");
             
-            // Fallback: try to find container by name if reference is missing
-            if (clueListContainer == null)
-            {
-                GameObject containerObj = GameObject.Find("ClueListContainer");
-                if (containerObj != null)
-                {
-                    clueListContainer = containerObj.transform;
-                    Debug.Log("Found ClueListContainer by name");
-                }
-                else
-                {
-                    Debug.LogError("clueListContainer is null and couldn't find by name! Cannot display clue.");
-                    return;
-                }
-            }
-            
-            if (clueItemPrefab == null)
-            {
-                // Try to find prefab in Resources as fallback
-                clueItemPrefab = Resources.Load<GameObject>("Prefabs/UI/ClueItem");
-                if (clueItemPrefab == null)
-                {
-                    Debug.LogError("[GameUI] clueItemPrefab is null and couldn't find in Resources! Cannot display clue.");
-                    return;
-                }
-                else
-                {
-                    Debug.Log("[GameUI] Found clueItemPrefab in Resources");
-                }
-            }
-            
-            // Ensure container is active and visible
-            if (!clueListContainer.gameObject.activeSelf)
-            {
-                clueListContainer.gameObject.SetActive(true);
-                Debug.Log("Activated ClueListContainer");
-            }
-            
-            // Ensure VerticalLayoutGroup is enabled on container
-            VerticalLayoutGroup layoutGroup = clueListContainer.GetComponent<VerticalLayoutGroup>();
-            if (layoutGroup == null)
-            {
-                layoutGroup = clueListContainer.gameObject.AddComponent<VerticalLayoutGroup>();
-                layoutGroup.spacing = 5f;
-                layoutGroup.padding = new RectOffset(10, 10, 10, 10);
-                layoutGroup.childControlWidth = true;
-                layoutGroup.childControlHeight = false; // Don't control height - let ContentSizeFitter handle it
-                layoutGroup.childForceExpandWidth = true;
-                layoutGroup.childForceExpandHeight = false; // Don't force expand - let items size to content
-                Debug.Log("[GameUI] Added VerticalLayoutGroup to ClueListContainer");
-            }
-            else
-            {
-                // Ensure settings allow children to expand
-                if (!layoutGroup.enabled)
-                {
-                    layoutGroup.enabled = true;
-                    Debug.Log("[GameUI] Enabled VerticalLayoutGroup on ClueListContainer");
-                }
-                // Update settings to allow child expansion
-                layoutGroup.childControlHeight = false; // Don't control height - let ContentSizeFitter handle it
-                layoutGroup.childForceExpandHeight = false; // Don't force expand - let items size to content
-            }
-
             // Get player name from PlayerManager first, then SteamLobbyManager
             string playerName = "Unknown";
             if (GameManager.Instance != null && GameManager.Instance.PlayerManager != null)
@@ -680,165 +579,369 @@ namespace Impostor.UI
             {
                 playerName = SteamLobbyManager.Instance.GetPlayerName(playerID);
             }
-
-            // Remove existing clue if player already submitted
-            if (_clueItems.TryGetValue(playerID, out GameObject existingItem))
-            {
-                if (existingItem != null)
-                {
-                    Destroy(existingItem);
-                }
-                _clueItems.Remove(playerID);
-            }
             
-            // Also check for orphaned children in container (not in dictionary)
-            // This can happen if items were created but not tracked
-            for (int i = clueListContainer.childCount - 1; i >= 0; i--)
-            {
-                Transform child = clueListContainer.GetChild(i);
-                // Check if this child is not in our dictionary
-                bool foundInDict = false;
-                foreach (var kvp in _clueItems)
-                {
-                    if (kvp.Value != null && kvp.Value.transform == child)
-                    {
-                        foundInDict = true;
-                        break;
-                    }
-                }
-                if (!foundInDict)
-                {
-                    Debug.LogWarning($"[GameUI] Found orphaned child in ClueListContainer: {child.name}, destroying it");
-                    Destroy(child.gameObject);
-                }
-            }
-
-            // Instantiate clue item
-            GameObject clueItem = Instantiate(clueItemPrefab, clueListContainer);
-            _clueItems[playerID] = clueItem;
-            
-            // Set RectTransform for proper layout BEFORE activating
-            RectTransform clueRect = clueItem.GetComponent<RectTransform>();
-            if (clueRect != null)
-            {
-                clueRect.localScale = Vector3.one;
-                
-                // CRITICAL: Set anchors and pivot FIRST, before sizeDelta
-                // This ensures the layout group can properly position the item
-                clueRect.anchorMin = new Vector2(0f, 1f);
-                clueRect.anchorMax = new Vector2(1f, 1f);
-                clueRect.pivot = new Vector2(0.5f, 1f);
-                
-                // Set minimum height, but allow expansion
-                clueRect.sizeDelta = new Vector2(0f, 40f); // Start with 40px, but will expand if needed
-                
-                // CRITICAL: DON'T set anchoredPosition - let VerticalLayoutGroup handle positioning
-                // The layout group will set this automatically based on child order
-                // Setting it manually causes all items to overlap at the same position
-            }
-            
-            // Configure the text component FIRST - it needs to fill the parent for ContentSizeFitter to work
-            TextMeshProUGUI clueText = clueItem.GetComponentInChildren<TextMeshProUGUI>();
-            if (clueText != null)
-            {
-                // Configure text RectTransform to fill parent FIRST
-                RectTransform textRect = clueText.GetComponent<RectTransform>();
-                if (textRect != null)
-                {
-                    // Make text fill the parent container so ContentSizeFitter can measure it
-                    textRect.anchorMin = Vector2.zero;
-                    textRect.anchorMax = Vector2.one;
-                    textRect.sizeDelta = Vector2.zero;
-                    textRect.offsetMin = new Vector2(5f, 5f); // Small padding inside the box
-                    textRect.offsetMax = new Vector2(-5f, -5f);
-                }
-                
-                // Configure text settings for wrapping
-                clueText.enableWordWrapping = true;
-                clueText.overflowMode = TextOverflowModes.Overflow; // Allow wrapping, don't truncate
-                clueText.color = Color.white;
-                
-                // Set text AFTER configuring RectTransform
-                clueText.text = $"{playerName}: {clue}";
-                
-                Debug.Log($"✓ Added clue to left panel: {playerName}: {clue}");
-            }
-            else
-            {
-                Debug.LogWarning($"ClueItem prefab doesn't have TextMeshProUGUI component!");
-            }
-            
-            // Add ContentSizeFitter to make the box expand to fit text content
-            // Do this AFTER configuring text so it can measure properly
-            ContentSizeFitter sizeFitter = clueItem.GetComponent<ContentSizeFitter>();
-            if (sizeFitter == null)
-            {
-                sizeFitter = clueItem.AddComponent<ContentSizeFitter>();
-            }
-            sizeFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-            sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize; // Expand vertically to fit content
-            
-            // Ensure it's active and visible AFTER RectTransform is configured
-            clueItem.SetActive(true);
-            
-            // Make sure the clue item GameObject is visible
-            if (clueItem != null)
-            {
-                clueItem.SetActive(true);
-                clueItem.hideFlags = HideFlags.None;
-            }
-            
-            // Force immediate layout update to make clue visible right away
-            // Do this AFTER all properties are set
-            if (clueListContainer != null && clueRect != null)
-            {
-                // Set sibling index to ensure proper ordering (layout group uses child order)
-                clueRect.SetAsLastSibling();
-                
-                // Mark the layout as dirty so it recalculates
-                UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(clueListContainer as RectTransform);
-                
-                // Also mark the item itself as needing layout
-                UnityEngine.UI.LayoutRebuilder.MarkLayoutForRebuild(clueRect);
-                
-                // Force canvas update to ensure layout is applied
-                Canvas.ForceUpdateCanvases();
-                
-                // Schedule another rebuild next frame to catch any edge cases
-                StartCoroutine(RebuildLayoutNextFrame(clueListContainer as RectTransform));
-            }
-            
-            // Log detailed info
-            Debug.Log($"[GameUI] ✓✓✓ Clue display added: {playerName}: {clue}");
-            Debug.Log($"[GameUI]    Container: {clueListContainer.name}, Active: {clueListContainer.gameObject.activeSelf}, Children: {clueListContainer.childCount}");
-            Debug.Log($"[GameUI]    ClueItem active: {clueItem.activeSelf}, Position: {clueRect?.anchoredPosition}, Size: {clueRect?.sizeDelta}");
-            Debug.Log($"[GameUI]    LayoutGroup enabled: {layoutGroup?.enabled}, Spacing: {layoutGroup?.spacing}");
-            
-            // Ensure parent (WorldPanel) is also visible
-            if (clueListContainer.parent != null)
-            {
-                clueListContainer.parent.gameObject.SetActive(true);
-                Debug.Log($"[GameUI]    Parent ({clueListContainer.parent.name}) is now active");
-            }
-            
-            // Double-check that the clue item is actually visible
-            if (clueItem != null && !clueItem.activeSelf)
-            {
-                Debug.LogWarning($"[GameUI] Clue item was not active! Activating now...");
-                clueItem.SetActive(true);
-            }
+            // Use dialogue box system instead of list
+            CreateDialogueBox(playerID, clue, playerName);
         }
 
         private void ClearClues()
         {
-            foreach (var item in _clueItems.Values)
+            // If using manual setup, just hide the text objects
+            if (manualClueTexts != null && manualClueTexts.Length > 0)
             {
-                if (item != null)
+                foreach (var text in manualClueTexts)
                 {
-                    Destroy(item);
+                    if (text != null)
+                    {
+                        text.text = "";
+                        text.gameObject.SetActive(false);
+                    }
+                }
+                _dialogueBoxes.Clear();
+                return;
+            }
+            
+            // Otherwise, destroy programmatically created boxes
+            foreach (var box in _dialogueBoxes.Values)
+            {
+                if (box != null)
+                {
+                    Destroy(box);
                 }
             }
-            _clueItems.Clear();
+            _dialogueBoxes.Clear();
+        }
+        
+        private void InitializeDialogueBoxSystem()
+        {
+            // Find table center - try TableSetup first, then tag, then create default
+            if (tableCenter == null)
+            {
+                // Try to get from TableSetup component
+                TableSetup tableSetup = FindFirstObjectByType<TableSetup>();
+                if (tableSetup != null)
+                {
+                    tableCenter = tableSetup.GetTableCenter();
+                    if (tableCenter != null)
+                    {
+                        Debug.Log("[GameUI] Found table center from TableSetup");
+                    }
+                }
+                
+                // Fallback: try to find by tag
+                if (tableCenter == null)
+                {
+                    GameObject tableObj = GameObject.FindGameObjectWithTag("Table");
+                    if (tableObj != null)
+                    {
+                        tableCenter = tableObj.transform;
+                        Debug.Log("[GameUI] Found table center by tag");
+                    }
+                }
+                
+                // Last resort: create default
+                if (tableCenter == null)
+                {
+                    GameObject defaultTable = new GameObject("TableCenter");
+                    tableCenter = defaultTable.transform;
+                    tableCenter.position = Vector3.zero;
+                    Debug.Log("[GameUI] Created default table center at origin");
+                }
+            }
+            
+            // Get table radius from TableSetup if available
+            TableSetup tableSetupForRadius = FindFirstObjectByType<TableSetup>();
+            if (tableSetupForRadius != null)
+            {
+                tableRadius = tableSetupForRadius.GetTableRadius();
+                Debug.Log($"[GameUI] Using table radius from TableSetup: {tableRadius}");
+            }
+            
+            // Find or create world space canvas
+            if (worldSpaceCanvas == null)
+            {
+                worldSpaceCanvas = FindFirstObjectByType<Canvas>();
+                if (worldSpaceCanvas != null && worldSpaceCanvas.renderMode == RenderMode.WorldSpace)
+                {
+                    Debug.Log("[GameUI] Found existing world space canvas");
+                }
+                else
+                {
+                    // Create new world space canvas
+                    GameObject canvasObj = new GameObject("WorldSpaceDialogueCanvas");
+                    worldSpaceCanvas = canvasObj.AddComponent<Canvas>();
+                    worldSpaceCanvas.renderMode = RenderMode.WorldSpace;
+                    worldSpaceCanvas.worldCamera = UnityEngine.Camera.main;
+                    
+                    // Scale the canvas transform to make UI elements appear at reasonable size in world space
+                    // 0.1 scale means 10px UI = 1 unit in world space
+                    // With 500px text size, this gives us 50 units wide text (very visible and large)
+                    canvasObj.transform.localScale = Vector3.one * 0.1f;
+                    Debug.Log($"[GameUI] Created world space canvas with scale: {canvasObj.transform.localScale}");
+                    
+                    // Add CanvasScaler for proper sizing
+                    CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+                    scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+                    scaler.scaleFactor = 1f; // Use 1:1 pixel scale since we're scaling the transform
+                    
+                    // Add GraphicRaycaster
+                    canvasObj.AddComponent<GraphicRaycaster>();
+                    
+                    Debug.Log("[GameUI] Created new world space canvas for dialogue boxes with scale 0.001");
+                }
+            }
+        }
+        
+        private void CalculatePlayerPositions()
+        {
+            _playerPositions.Clear();
+            
+            if (tableCenter == null || GameManager.Instance?.PlayerManager == null)
+            {
+                Debug.LogWarning("[GameUI] Cannot calculate player positions - table center or player manager missing");
+                return;
+            }
+            
+            List<CSteamID> players = GameManager.Instance.PlayerManager.AllPlayers;
+            int playerCount = players.Count;
+            
+            if (playerCount == 0)
+            {
+                return;
+            }
+            
+            Vector3 tablePos = tableCenter.position;
+            float angleStep = 360f / playerCount;
+            
+            for (int i = 0; i < playerCount; i++)
+            {
+                float angle = i * angleStep * Mathf.Deg2Rad;
+                Vector3 position = tablePos + new Vector3(
+                    Mathf.Sin(angle) * tableRadius,
+                    0f,
+                    Mathf.Cos(angle) * tableRadius
+                );
+                
+                _playerPositions[players[i]] = position;
+                Debug.Log($"[GameUI] Player {players[i]} position: {position}");
+            }
+        }
+        
+        private void CreateDialogueBox(CSteamID playerID, string clue, string playerName)
+        {
+            Debug.Log($"[GameUI] CreateDialogueBox START: playerID={playerID}, clue='{clue}', playerName='{playerName}'");
+            
+            // Check if using manual text setup
+            if (manualClueTexts != null && manualClueTexts.Length > 0)
+            {
+                UseManualTextSetup(playerID, clue, playerName);
+                return;
+            }
+            
+            // Ensure player positions are calculated
+            if (_playerPositions.Count == 0)
+            {
+                Debug.Log("[GameUI] Player positions empty, calculating now...");
+                CalculatePlayerPositions();
+            }
+            
+            // Ensure world space canvas exists
+            if (worldSpaceCanvas == null)
+            {
+                Debug.Log("[GameUI] World space canvas is null, initializing...");
+                InitializeDialogueBoxSystem();
+            }
+            
+            if (worldSpaceCanvas == null)
+            {
+                Debug.LogError("[GameUI] Cannot create dialogue box - world space canvas is null!");
+                return;
+            }
+            
+            Debug.Log($"[GameUI] Canvas found: {worldSpaceCanvas.name}, Scale: {worldSpaceCanvas.transform.localScale}, Camera: {worldSpaceCanvas.worldCamera?.name ?? "NULL"}");
+            
+            // Get player position - check if this is the local player (camera)
+            Vector3 boxPosition = Vector3.zero;
+            bool foundPosition = false;
+            
+            // Check if this is the local player - position above camera head
+            CSteamID localPlayerID = Impostor.Steam.SteamManager.Instance?.LocalSteamID ?? CSteamID.Nil;
+            if (playerID == localPlayerID && UnityEngine.Camera.main != null)
+            {
+                // For local player, position text directly above camera (in front and above)
+                Transform cameraTransform = UnityEngine.Camera.main.transform;
+                Vector3 cameraPos = cameraTransform.position;
+                Vector3 cameraForward = cameraTransform.forward;
+                
+                // Position slightly in front of camera (0.3 units) and above (1.2 units)
+                // This ensures it's visible above your head, not behind you
+                boxPosition = cameraPos + cameraForward * 0.3f + Vector3.up * 1.2f;
+                foundPosition = true;
+                Debug.Log($"[GameUI] Local player - camera at {cameraPos}, forward: {cameraForward}, placing text at {boxPosition}");
+            }
+            
+            // For other players, try to find player marker
+            if (!foundPosition)
+            {
+                GameObject[] allObjects = FindObjectsOfType<GameObject>();
+                foreach (GameObject obj in allObjects)
+                {
+                    if (obj.name.StartsWith("PlayerMarker_"))
+                    {
+                        // Check if this marker is near our calculated position
+                        if (_playerPositions.ContainsKey(playerID))
+                        {
+                            Vector3 expectedPos = _playerPositions[playerID];
+                            float distance = Vector3.Distance(obj.transform.position, expectedPos);
+                            if (distance < 2f) // Within 2 units
+                            {
+                                // Position text container above player's head (0.8 units above marker - higher for name + clue)
+                                boxPosition = obj.transform.position + Vector3.up * 0.8f;
+                                foundPosition = true;
+                                Debug.Log($"[GameUI] Found player marker {obj.name} at {obj.transform.position}, placing text container at {boxPosition}");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Fallback to calculated position - higher for name + clue
+            if (!foundPosition && _playerPositions.ContainsKey(playerID))
+            {
+                boxPosition = _playerPositions[playerID] + Vector3.up * 0.8f; // 0.8 units above (higher for name + clue)
+                foundPosition = true;
+                Debug.Log($"[GameUI] Using calculated position for player {playerID}: {boxPosition}");
+            }
+            
+            if (!foundPosition)
+            {
+                Debug.LogWarning($"[GameUI] No position found for player {playerID}, cannot create dialogue box");
+                return;
+            }
+            
+            // Remove existing texts for this player
+            if (_dialogueBoxes.TryGetValue(playerID, out GameObject existingText))
+            {
+                if (existingText != null)
+                {
+                    Destroy(existingText);
+                }
+                _dialogueBoxes.Remove(playerID);
+            }
+            
+            // Create parent object to hold both name and clue text
+            GameObject textContainer = new GameObject($"PlayerTextContainer_{playerID}");
+            textContainer.transform.position = boxPosition;
+            
+            // Player name - positioned at the TOP (0.4 units above center)
+            GameObject nameObj = new GameObject("PlayerName");
+            nameObj.transform.SetParent(textContainer.transform);
+            nameObj.transform.localPosition = Vector3.up * 0.4f; // TOP position
+            
+            TMPro.TextMeshPro nameMesh = nameObj.AddComponent<TMPro.TextMeshPro>();
+            nameMesh.text = playerName;
+            nameMesh.fontSize = 1.5f; // Slightly smaller for name
+            nameMesh.alignment = TMPro.TextAlignmentOptions.Center;
+            nameMesh.color = Color.white;
+            nameMesh.fontStyle = TMPro.FontStyles.Bold;
+            nameMesh.outlineWidth = 0.2f;
+            nameMesh.outlineColor = Color.black;
+            
+            // Clue text - positioned at the BOTTOM (0.3 units below center)
+            GameObject clueObj = new GameObject("ClueText");
+            clueObj.transform.SetParent(textContainer.transform);
+            clueObj.transform.localPosition = Vector3.down * 0.3f; // BOTTOM position
+            
+            TMPro.TextMeshPro clueMesh = clueObj.AddComponent<TMPro.TextMeshPro>();
+            clueMesh.text = clue; // Show the clue word
+            clueMesh.fontSize = 1.8f; // Slightly larger for clue
+            clueMesh.alignment = TMPro.TextAlignmentOptions.Center;
+            clueMesh.color = Color.yellow; // Yellow for clue
+            clueMesh.fontStyle = TMPro.FontStyles.Bold;
+            clueMesh.outlineWidth = 0.2f;
+            clueMesh.outlineColor = Color.black;
+            
+            // Make container face camera (billboard effect)
+            textContainer.transform.LookAt(UnityEngine.Camera.main.transform);
+            textContainer.transform.Rotate(0f, 180f, 0f); // Flip to face camera
+            
+            _dialogueBoxes[playerID] = textContainer;
+            Debug.Log($"[GameUI] ✓ Created player name '{playerName}' and clue '{clue}' above head at {boxPosition}");
+        }
+        
+        private void UseManualTextSetup(CSteamID playerID, string clue, string playerName)
+        {
+            // Find player index
+            List<CSteamID> players = GameManager.Instance?.PlayerManager?.AllPlayers;
+            if (players == null || players.Count == 0)
+            {
+                Debug.LogWarning("[GameUI] Cannot use manual text setup - no players found");
+                return;
+            }
+            
+            int playerIndex = players.IndexOf(playerID);
+            if (playerIndex < 0 || playerIndex >= manualClueTexts.Length)
+            {
+                Debug.LogWarning($"[GameUI] Player {playerID} index {playerIndex} out of range for manual texts (array size: {manualClueTexts.Length})");
+                return;
+            }
+            
+            TextMeshProUGUI textObj = manualClueTexts[playerIndex];
+            if (textObj == null)
+            {
+                Debug.LogWarning($"[GameUI] Manual text object at index {playerIndex} is null");
+                return;
+            }
+            
+            // Update text
+            textObj.text = clue;
+            textObj.gameObject.SetActive(true);
+            
+            // Position above player marker if found
+            GameObject playerMarker = GameObject.Find($"PlayerMarker_{playerIndex + 1}"); // Markers start at 1
+            if (playerMarker != null)
+            {
+                Vector3 markerPos = playerMarker.transform.position;
+                textObj.transform.position = markerPos + Vector3.up * 2.5f;
+                Debug.Log($"[GameUI] Positioned manual text for {playerName} above marker at {textObj.transform.position}");
+            }
+            
+            // Store reference
+            if (!_dialogueBoxes.ContainsKey(playerID))
+            {
+                _dialogueBoxes[playerID] = textObj.gameObject;
+            }
+            
+            Debug.Log($"[GameUI] ✓ Updated manual text for {playerName} with clue: '{clue}'");
+        }
+        
+        private void UpdateDialogueBoxRotation(RectTransform rect)
+        {
+            if (rect == null || UnityEngine.Camera.main == null) return;
+            rect.LookAt(UnityEngine.Camera.main.transform);
+            rect.Rotate(0f, 180f, 0f); // Flip to face camera correctly
+        }
+        
+        private void UpdateDialogueBoxRotation(Transform transform)
+        {
+            if (transform == null || UnityEngine.Camera.main == null) return;
+            transform.LookAt(UnityEngine.Camera.main.transform);
+            transform.Rotate(0f, 180f, 0f); // Flip to face camera correctly
+        }
+        
+        private void UpdateDialogueBoxes()
+        {
+            if (UnityEngine.Camera.main == null) return;
+            
+            foreach (var kvp in _dialogueBoxes)
+            {
+                if (kvp.Value == null) continue;
+                
+                // Make text face camera (simple billboard)
+                kvp.Value.transform.LookAt(UnityEngine.Camera.main.transform);
+                kvp.Value.transform.Rotate(0f, 180f, 0f); // Flip to face camera
+            }
         }
         
         private System.Collections.IEnumerator RebuildLayoutNextFrame(RectTransform container)
@@ -849,6 +952,33 @@ namespace Impostor.UI
                 UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(container);
                 Canvas.ForceUpdateCanvases();
             }
+        }
+        
+        private System.Collections.IEnumerator AdjustDialogueBoxSize(GameObject dialogueBox, TextMeshProUGUI text)
+        {
+            yield return null; // Wait one frame for text to calculate
+            yield return null; // Wait another frame to be sure
+            
+            if (dialogueBox == null || text == null) yield break;
+            
+            RectTransform rect = dialogueBox.GetComponent<RectTransform>();
+            if (rect == null) yield break;
+            
+            // Get the preferred height of the text
+            float preferredHeight = text.preferredHeight;
+            float preferredWidth = text.preferredWidth;
+            
+            // Set box height to fit text (with padding) - keep it SMALL and compact
+            float boxHeight = Mathf.Max(40f, preferredHeight + 16f); // Minimum 40px, add 16px padding
+            float boxWidth = Mathf.Min(250f, Mathf.Max(200f, preferredWidth + 20f)); // Between 200-250px max, add 20px padding
+            
+            rect.sizeDelta = new Vector2(boxWidth, boxHeight);
+            
+            // Force layout update
+            Canvas.ForceUpdateCanvases();
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
+            
+            Debug.Log($"[GameUI] Adjusted dialogue box size: {boxWidth}x{boxHeight} for text: {text.text}");
         }
 
         private void SubmitClue()
@@ -967,7 +1097,9 @@ namespace Impostor.UI
                 SubscribeToRoundManagerEvents();
             }
             
+            UpdateClueTimer();
             UpdateTurnIndicator();
+            UpdateDialogueBoxes(); // Keep dialogue boxes facing camera
             
             // Debug: Log state every 60 frames (once per second) to avoid spam
             if (Time.frameCount % 60 == 0 && GameManager.Instance != null)
