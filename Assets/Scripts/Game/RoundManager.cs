@@ -87,9 +87,28 @@ namespace Impostor.Game
             // Get secret word
             _currentSecretWord = WordManager.Instance.GetRandomWord();
 
-            // Set up turn order (randomize)
+            // Set up turn order - always put local player first, then randomize the rest
             _turnOrder = new List<CSteamID>(_playerManager.AllPlayers);
-            Shuffle(_turnOrder);
+            
+            // Get local player ID
+            CSteamID localPlayerID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
+            
+            // Remove local player from list if present
+            if (_turnOrder.Contains(localPlayerID))
+            {
+                _turnOrder.Remove(localPlayerID);
+                // Shuffle the remaining players
+                Shuffle(_turnOrder);
+                // Put local player at the front
+                _turnOrder.Insert(0, localPlayerID);
+            }
+            else
+            {
+                // If local player not found, just shuffle normally
+                Shuffle(_turnOrder);
+            }
+            
+            Debug.Log($"[RoundManager] Turn order set - Local player {localPlayerID} is first. Full order: {string.Join(", ", _turnOrder)}");
 
             // Reset player states
             _playerManager.ResetRoundState();
@@ -170,6 +189,8 @@ namespace Impostor.Game
             };
             NetworkManager.Instance.BroadcastMessage(message);
 
+            // Invoke event immediately - this ensures clues appear instantly in UI
+            Debug.Log($"[RoundManager] Invoking OnClueSubmitted event for player {playerID} with clue: {clue}");
             OnClueSubmitted?.Invoke(playerID, clue);
 
             // Move to next player

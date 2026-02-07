@@ -120,6 +120,8 @@ namespace Impostor.UI
             _hasVoted = false;
             _selectedVote = CSteamID.Nil;
             CreateVoteButtons();
+            // Ensure buttons are enabled when voting starts
+            SetButtonsInteractable(true);
             UpdateVotingStatus("Vote for who you think is the Impostor!");
             
             // Hide results panel if visible
@@ -479,27 +481,45 @@ namespace Impostor.UI
 
         private void CastVote(CSteamID targetID)
         {
+            // Prevent double voting - check immediately
             if (_hasVoted)
             {
+                Debug.LogWarning("[VoteUI] Player already voted, ignoring duplicate vote");
                 return;
             }
-
-            _selectedVote = targetID;
-            _hasVoted = true;
-
+            
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
+            
             if (GameManager.Instance == null)
             {
+                Debug.LogError("[VoteUI] GameManager is null");
                 return;
             }
-
+            
             VoteManager voteManager = GameManager.Instance.VoteManager;
             if (voteManager == null)
             {
+                Debug.LogError("[VoteUI] VoteManager is null");
                 return;
             }
-
-            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
-
+            
+            // Check if player already voted (double-check with VoteManager)
+            var playerData = GameManager.Instance.PlayerManager?.GetPlayer(localID);
+            if (playerData != null && playerData.HasVoted)
+            {
+                Debug.LogWarning("[VoteUI] Player already voted according to PlayerManager");
+                _hasVoted = true;
+                SetButtonsInteractable(false);
+                return;
+            }
+            
+            // Mark as voted immediately to prevent double clicks
+            _hasVoted = true;
+            _selectedVote = targetID;
+            SetButtonsInteractable(false);
+            
+            Debug.Log($"[VoteUI] Casting vote: {localID} -> {targetID}");
+            
             if (GameManager.Instance.IsHost)
             {
                 voteManager.CastVote(localID, targetID);
@@ -513,9 +533,8 @@ namespace Impostor.UI
                 };
                 NetworkManager.Instance.SendMessage(message, GetHostSteamID());
             }
-
-            UpdateVotingStatus("Vote submitted!");
-            SetButtonsInteractable(false);
+            
+            UpdateVotingStatus("You voted!");
         }
 
         private void UpdateVoteCounts()

@@ -77,6 +77,13 @@ namespace Impostor.Game
                 return;
             }
 
+            // Prevent restarting if voting is already in progress
+            if (_votingInProgress)
+            {
+                Debug.LogWarning("[VoteManager] Voting already in progress, not restarting. Timer: " + _votingTimer + "/" + _votingDuration);
+                return;
+            }
+
             _votingInProgress = true;
             _votingTimer = 0f;
             _votingDuration = duration;
@@ -94,33 +101,39 @@ namespace Impostor.Game
             }
 
             OnVotingStarted?.Invoke();
-            Debug.Log("Voting phase started");
+            Debug.Log($"[VoteManager] Voting phase started - Duration: {duration}s");
         }
 
         public void CastVote(CSteamID voterID, CSteamID targetID)
         {
             if (!_votingInProgress)
             {
-                Debug.LogWarning("Voting not in progress");
+                Debug.LogWarning("[VoteManager] Voting not in progress - cannot cast vote");
                 return;
             }
 
             if (!_playerManager.HasPlayer(voterID))
             {
-                Debug.LogWarning($"Voter {voterID} not in game");
+                Debug.LogWarning($"[VoteManager] Voter {voterID} not in game");
                 return;
             }
 
             if (!_playerManager.HasPlayer(targetID) && targetID != CSteamID.Nil)
             {
-                Debug.LogWarning($"Target {targetID} not in game");
+                Debug.LogWarning($"[VoteManager] Target {targetID} not in game");
                 return;
             }
 
             PlayerData voter = _playerManager.GetPlayer(voterID);
-            if (voter == null || voter.HasVoted)
+            if (voter == null)
             {
-                Debug.LogWarning("Player already voted");
+                Debug.LogWarning($"[VoteManager] Voter {voterID} not found in PlayerManager");
+                return;
+            }
+            
+            if (voter.HasVoted)
+            {
+                Debug.LogWarning($"[VoteManager] Player {voterID} already voted - preventing duplicate vote");
                 return;
             }
 

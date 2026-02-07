@@ -258,6 +258,13 @@ namespace Impostor.Game
         public void OnAllCluesSubmitted()
         {
             ChangeState(GameState.Voting);
+            
+            // Start voting timer - only the host should start it, but clients can too for local timer
+            if (_voteManager != null && !_voteManager.VotingInProgress)
+            {
+                _voteManager.StartVoting(5f);
+                Debug.Log("[GameManager] Started voting timer in OnAllCluesSubmitted");
+            }
         }
 
         public void OnVotingEnded(CSteamID votedOut, bool wasImpostor)

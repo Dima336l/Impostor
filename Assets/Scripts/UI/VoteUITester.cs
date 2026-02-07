@@ -170,7 +170,7 @@ namespace Impostor.UI
                 // Generate a random clue based on role
                 string clue = GenerateClue(playerData.Role, roundManager.CurrentSecretWord);
                 
-                // Wait exactly 5 seconds for each player
+                // Wait for timer to expire (exactly 5 seconds) then submit immediately
                 if (currentPlayerID == localID)
                 {
                     Debug.Log($"Local player's turn - you have {clueTimePerPlayer} seconds to input your clue!");
@@ -187,13 +187,40 @@ namespace Impostor.UI
                 }
                 else
                 {
-                    // Auto-submit for dummy players after exactly 5 seconds
-                    yield return new UnityEngine.WaitForSeconds(clueTimePerPlayer);
+                    // For dummy players: Wait for timer to expire then submit IMMEDIATELY
+                    // Poll every 0.05 seconds (50ms) to check timer remaining, submit instantly when <= 0
+                    float waitTime = 0f;
+                    GameUI gameUI = FindFirstObjectByType<GameUI>();
                     
-                    if (GameManager.Instance.IsHost && !playerData.HasSubmittedClue)
+                    while (waitTime < clueTimePerPlayer + 0.2f && !playerData.HasSubmittedClue) // Small buffer
+                    {
+                        yield return new UnityEngine.WaitForSeconds(0.05f); // Check every 50ms for instant response
+                        waitTime += 0.05f;
+                        
+                        // Check timer remaining time - submit when timer reaches 0 or is very close
+                        if (gameUI != null)
+                        {
+                            float timerRemaining = gameUI.ClueTimerRemaining;
+                            
+                            // Submit immediately when timer is at or below 0.1s (essentially expired)
+                            if (timerRemaining <= 0.1f)
+                            {
+                                // Timer expired or about to expire - submit IMMEDIATELY, no additional delay
+                                if (GameManager.Instance.IsHost && !playerData.HasSubmittedClue)
+                                {
+                                    roundManager.SubmitClue(currentPlayerID, clue);
+                                    Debug.Log($"Auto-submitted clue for {playerData.PlayerName}: {clue} (instant submit when timer at {timerRemaining:F2}s, waited {waitTime:F2}s)");
+                                }
+                                break; // Exit loop immediately after submission
+                            }
+                        }
+                    }
+                    
+                    // Fallback: If timer check didn't work, submit after 5 seconds anyway
+                    if (!playerData.HasSubmittedClue && GameManager.Instance.IsHost)
                     {
                         roundManager.SubmitClue(currentPlayerID, clue);
-                        Debug.Log($"Auto-submitted clue for {playerData.PlayerName}: {clue}");
+                        Debug.Log($"Auto-submitted clue for {playerData.PlayerName}: {clue} (fallback after {waitTime:F2}s)");
                     }
                 }
                 
