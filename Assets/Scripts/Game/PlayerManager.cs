@@ -34,7 +34,8 @@ namespace Impostor.Game
                     HasSubmittedClue = false,
                     HasVoted = false,
                     VoteTarget = CSteamID.Nil,
-                    Clue = string.Empty
+                    Clue = string.Empty,
+                    HasAcknowledgedDraft = false
                 };
 
                 _players[steamID] = player;
@@ -135,6 +136,27 @@ namespace Impostor.Game
             }
         }
 
+        public void ResetDraftAcknowledgment()
+        {
+            foreach (var player in _players.Values)
+            {
+                player.HasAcknowledgedDraft = false;
+            }
+        }
+
+        public void SetDraftAcknowledged(CSteamID steamID, bool acknowledged)
+        {
+            if (_players.TryGetValue(steamID, out PlayerData player))
+            {
+                player.HasAcknowledgedDraft = acknowledged;
+            }
+        }
+
+        public bool AllPlayersAcknowledgedDraft()
+        {
+            return _players.Values.All(p => p.HasAcknowledgedDraft);
+        }
+
         public void Clear()
         {
             _players.Clear();
@@ -160,6 +182,7 @@ namespace Impostor.Game
         public bool HasVoted { get; set; }
         public CSteamID VoteTarget { get; set; }
         public string Clue { get; set; }
+        public bool HasAcknowledgedDraft { get; set; }
     }
 }
 

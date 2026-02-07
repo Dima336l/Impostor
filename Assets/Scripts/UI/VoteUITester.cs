@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Steamworks;
 using Impostor.Game;
@@ -81,24 +82,115 @@ namespace Impostor.UI
         {
             Debug.Log("=== Starting Full Round Simulation ===");
             
-            // Step 1: Start the round (InGame state)
-            GameManager.Instance.ChangeState(GameManager.GameState.InGame);
-            yield return new UnityEngine.WaitForSeconds(0.5f);
-            
-            // Step 2: Start the round
-            if (GameManager.Instance.RoundManager != null)
+            // Step 1: Assign roles and enter GameStarting state (which triggers DraftPhase)
+            if (GameManager.Instance.IsHost)
             {
-                GameManager.Instance.RoundManager.StartRound();
-                Debug.Log("Round started, beginning clue phase...");
+                int impostorCount = Math.Max(1, GameManager.Instance.PlayerManager.PlayerCount / 4);
+                GameManager.Instance.PlayerManager.AssignRoles(impostorCount);
+                Debug.Log("Roles assigned, entering draft phase...");
             }
             
-            // Step 3: Auto-submit clues for all players (5 seconds per player)
+            // Step 2: Enter GameStarting state (which will transition to DraftPhase)
+            GameManager.Instance.ChangeState(GameManager.GameState.GameStarting);
+            yield return new UnityEngine.WaitForSeconds(0.5f);
+            
+            // Step 3: Wait for draft phase to be active
+            int waitCount = 0;
+            while (GameManager.Instance.CurrentState != GameManager.GameState.DraftPhase && waitCount < 50)
+            {
+                yield return new UnityEngine.WaitForSeconds(0.1f);
+                waitCount++;
+            }
+            
+            if (GameManager.Instance.CurrentState != GameManager.GameState.DraftPhase)
+            {
+                Debug.LogError("Draft phase did not start!");
+                yield break;
+            }
+            
+            Debug.Log("Draft phase active - showing word/role to players");
+            
+            // Step 4: Auto-acknowledge for all players (including dummy players)
+            yield return StartCoroutine(AutoAcknowledgeDraft());
+            
+            // Step 5: Wait for draft phase to complete and transition to InGame
+            waitCount = 0;
+            while (GameManager.Instance.CurrentState != GameManager.GameState.InGame && waitCount < 100)
+            {
+                yield return new UnityEngine.WaitForSeconds(0.1f);
+                waitCount++;
+            }
+            
+            if (GameManager.Instance.CurrentState != GameManager.GameState.InGame)
+            {
+                Debug.LogError("Did not transition to InGame state after draft phase!");
+                yield break;
+            }
+            
+            Debug.Log("Draft phase complete, starting clue submission phase...");
+            
+            // Step 6: Auto-submit clues for all players (5 seconds per player)
             yield return StartCoroutine(AutoSubmitClues());
             
-            // Step 4: Wait for voting phase to start
+            // Step 7: Wait for voting phase to start
             yield return new UnityEngine.WaitForSeconds(1f);
             
             Debug.Log("=== Full Round Simulation Complete ===");
+        }
+        
+        private System.Collections.IEnumerator AutoAcknowledgeDraft()
+        {
+            var playerManager = GameManager.Instance.PlayerManager;
+            var localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
+            
+            if (playerManager == null)
+            {
+                Debug.LogError("PlayerManager is null!");
+                yield break;
+            }
+            
+            Debug.Log("Auto-acknowledging draft for all players...");
+            
+            // Wait a bit for word assignment messages to be received and UI to update
+            yield return new UnityEngine.WaitForSeconds(1f);
+            
+            // Acknowledge for dummy players first (quickly)
+            var allPlayers = playerManager.AllPlayers;
+            foreach (var playerID in allPlayers)
+            {
+                if (playerID == localID) continue; // Skip local player for now
+                
+                var playerData = playerManager.GetPlayer(playerID);
+                if (playerData != null && !playerData.HasAcknowledgedDraft)
+                {
+                    if (GameManager.Instance.IsHost)
+                    {
+                        // Host can directly acknowledge
+                        GameManager.Instance.OnDraftAcknowledged(playerID);
+                        Debug.Log($"Auto-acknowledged draft for {playerData.PlayerName}");
+                    }
+                    
+                    // Small delay between acknowledgments
+                    yield return new UnityEngine.WaitForSeconds(0.2f);
+                }
+            }
+            
+            // Wait a bit longer for local player to see their word/role (3 seconds)
+            Debug.Log("Waiting 3 seconds for local player to see their word/role...");
+            yield return new UnityEngine.WaitForSeconds(3f);
+            
+            // Now acknowledge for local player
+            var localPlayerData = playerManager.GetPlayer(localID);
+            if (localPlayerData != null && !localPlayerData.HasAcknowledgedDraft)
+            {
+                if (GameManager.Instance.IsHost)
+                {
+                    GameManager.Instance.OnDraftAcknowledged(localID);
+                    Debug.Log($"Auto-acknowledged draft for local player: {localPlayerData.PlayerName}");
+                }
+            }
+            
+            Debug.Log("All players have acknowledged draft phase");
         }
         
         private System.Collections.IEnumerator AutoSubmitClues()

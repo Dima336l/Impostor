@@ -21,7 +21,8 @@ namespace Impostor.Networking
             RoundEnd = 8,
             GameEnd = 9,
             ReadyState = 10,
-            PlayerAction = 11
+            PlayerAction = 11,
+            DraftAcknowledged = 12
         }
 
         public abstract MessageType Type { get; }
@@ -88,6 +89,9 @@ namespace Impostor.Networking
                     break;
                 case MessageType.PlayerAction:
                     message = new PlayerActionMessage();
+                    break;
+                case MessageType.DraftAcknowledged:
+                    message = new DraftAcknowledgedMessage();
                     break;
             }
 
@@ -373,6 +377,22 @@ namespace Impostor.Networking
             {
                 ActionData = reader.ReadBytes(length);
             }
+        }
+    }
+
+    public class DraftAcknowledgedMessage : NetworkMessage
+    {
+        public override MessageType Type => MessageType.DraftAcknowledged;
+        public ulong PlayerSteamID { get; set; }
+
+        protected override void SerializeData(BinaryWriter writer)
+        {
+            writer.Write(PlayerSteamID);
+        }
+
+        protected override void DeserializeData(BinaryReader reader)
+        {
+            PlayerSteamID = reader.ReadUInt64();
         }
     }
 }

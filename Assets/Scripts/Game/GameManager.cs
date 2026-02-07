@@ -33,6 +33,7 @@ namespace Impostor.Game
             Lobby,
             WaitingForReady,
             GameStarting,
+            DraftPhase,
             InGame,
             Voting,
             RoundResults,
@@ -113,6 +114,7 @@ namespace Impostor.Game
                 NetworkManager.Instance.RegisterMessageHandler(NetworkMessage.MessageType.ReadyState, HandleReadyState);
                 NetworkManager.Instance.RegisterMessageHandler(NetworkMessage.MessageType.ClueSubmitted, HandleClueSubmitted);
                 NetworkManager.Instance.RegisterMessageHandler(NetworkMessage.MessageType.VoteSubmitted, HandleVoteSubmitted);
+                NetworkManager.Instance.RegisterMessageHandler(NetworkMessage.MessageType.DraftAcknowledged, HandleDraftAcknowledged);
             }
 
             ChangeState(GameState.MainMenu);
@@ -136,6 +138,9 @@ namespace Impostor.Game
                     break;
                 case GameState.GameStarting:
                     OnEnterGameStarting();
+                    break;
+                case GameState.DraftPhase:
+                    OnEnterDraftPhase();
                     break;
                 case GameState.InGame:
                     OnEnterInGame();
@@ -193,9 +198,23 @@ namespace Impostor.Game
                 int impostorCount = Math.Max(1, _playerManager.PlayerCount / 4); // 1 impostor per 4 players
                 _playerManager.AssignRoles(impostorCount);
 
-                // Start first round
+                // Start first round - this will transition to DraftPhase
                 _roundsPlayed = 0;
                 StartNextRound();
+            }
+        }
+
+        private void OnEnterDraftPhase()
+        {
+            if (_isHost)
+            {
+                // Distribute words to players (civilians get word, impostors get "IMPOSTOR")
+                _roundManager.DistributeWords();
+                
+                // Reset acknowledgment tracking
+                _playerManager.ResetDraftAcknowledgment();
+                
+                Debug.Log("[GameManager] Entered DraftPhase - words distributed, waiting for acknowledgments");
             }
         }
 
@@ -251,8 +270,27 @@ namespace Impostor.Game
         private void StartNextRound()
         {
             _roundsPlayed++;
-            _roundManager.StartRound();
-            ChangeState(GameState.InGame);
+            // First enter draft phase to distribute words
+            ChangeState(GameState.DraftPhase);
+        }
+
+        public void OnDraftAcknowledged(CSteamID playerID)
+        {
+            if (!_isHost) return;
+            
+            _playerManager.SetDraftAcknowledged(playerID, true);
+            CheckAllPlayersAcknowledged();
+        }
+
+        private void CheckAllPlayersAcknowledged()
+        {
+            if (_playerManager.AllPlayersAcknowledgedDraft())
+            {
+                // All players have seen their word, start the clue submission phase
+                _roundManager.StartRound();
+                ChangeState(GameState.InGame);
+                Debug.Log("[GameManager] All players acknowledged draft - starting clue submission phase");
+            }
         }
 
         public void OnAllCluesSubmitted()
@@ -423,6 +461,14 @@ namespace Impostor.Game
             }
         }
 
+        private void HandleDraftAcknowledged(NetworkMessage message, CSteamID senderID)
+        {
+            if (message is DraftAcknowledgedMessage draftMsg && _isHost)
+            {
+                OnDraftAcknowledged(new CSteamID(draftMsg.PlayerSteamID));
+            }
+        }
+
         public void SetReady(bool ready)
         {
             ReadyStateMessage message = new ReadyStateMessage
@@ -442,7 +488,7 @@ namespace Impostor.Game
             }
         }
 
-        private CSteamID GetHostSteamID()
+        public CSteamID GetHostSteamID()
         {
             if (SteamLobbyManager.Instance.IsInLobby)
             {

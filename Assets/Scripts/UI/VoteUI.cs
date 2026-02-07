@@ -156,10 +156,19 @@ namespace Impostor.UI
 
         private void OnVotingEnded(CSteamID votedOut, bool wasImpostor)
         {
-            // Hide voting panel
+            // Hide voting panel immediately
             SetVotePanelActive(false);
             
-            // Show results
+            // Wait 5 seconds before showing results panel
+            StartCoroutine(ShowResultsAfterDelay(votedOut, wasImpostor));
+        }
+        
+        private IEnumerator ShowResultsAfterDelay(CSteamID votedOut, bool wasImpostor)
+        {
+            Debug.Log("[VoteUI] Waiting 5 seconds before showing voting results...");
+            yield return new WaitForSeconds(5f);
+            
+            // Now show the results panel
             ShowVotingResults(votedOut, wasImpostor);
         }
         

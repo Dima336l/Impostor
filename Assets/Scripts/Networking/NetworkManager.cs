@@ -138,6 +138,23 @@ namespace Impostor.Networking
         {
             Impostor.Steam.SteamNetworking.Instance.CloseAllConnections();
         }
+
+        /// <summary>
+        /// Handles a message for the local player directly (without going through network).
+        /// Used when the host needs to send a message to themselves.
+        /// </summary>
+        public void HandleMessageForLocalPlayer(NetworkMessage message)
+        {
+            CSteamID localID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
+            
+            // Invoke the message handlers directly
+            OnMessageReceived?.Invoke(message, localID);
+            
+            if (_messageHandlers.TryGetValue(message.Type, out Action<NetworkMessage, CSteamID> handler))
+            {
+                handler?.Invoke(message, localID);
+            }
+        }
     }
 }
 

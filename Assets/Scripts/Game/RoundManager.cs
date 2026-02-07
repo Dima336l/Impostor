@@ -71,6 +71,76 @@ namespace Impostor.Game
             _playerManager = playerManager;
         }
 
+        public void DistributeWords()
+        {
+            if (_playerManager == null || _playerManager.PlayerCount < 4)
+            {
+                Debug.LogError("Not enough players to distribute words");
+                return;
+            }
+
+            // Get secret word from WordManager (randomly selected from the word database)
+            _currentSecretWord = WordManager.Instance.GetRandomWord();
+            Debug.Log($"[RoundManager] Distributing words. Secret word: {_currentSecretWord}");
+
+            List<CSteamID> impostors = _playerManager.GetImpostors();
+            List<CSteamID> civilians = _playerManager.GetCivilians();
+            
+            CSteamID localPlayerID = Impostor.Steam.SteamManager.Instance.LocalSteamID;
+
+            // Send word to civilians
+            foreach (CSteamID civilianID in civilians)
+            {
+                WordAssignedMessage message = new WordAssignedMessage
+                {
+                    PlayerSteamID = civilianID.m_SteamID,
+                    Word = _currentSecretWord,
+                    IsImpostor = false
+                };
+                
+                // If this is the local player (host), handle directly instead of sending network message
+                if (civilianID == localPlayerID)
+                {
+                    Debug.Log($"[RoundManager] Local player is civilian - assigning word directly: {_currentSecretWord}");
+                    // Trigger the word assignment handler directly for local player
+                    if (NetworkManager.Instance != null)
+                    {
+                        NetworkManager.Instance.HandleMessageForLocalPlayer(message);
+                    }
+                }
+                else
+                {
+                    NetworkManager.Instance.SendMessage(message, civilianID);
+                }
+            }
+
+            // Send "IMPOSTOR" to impostors
+            foreach (CSteamID impostorID in impostors)
+            {
+                WordAssignedMessage message = new WordAssignedMessage
+                {
+                    PlayerSteamID = impostorID.m_SteamID,
+                    Word = "IMPOSTOR",
+                    IsImpostor = true
+                };
+                
+                // If this is the local player (host), handle directly instead of sending network message
+                if (impostorID == localPlayerID)
+                {
+                    Debug.Log($"[RoundManager] Local player is impostor - assigning word directly: IMPOSTOR");
+                    // Trigger the word assignment handler directly for local player
+                    if (NetworkManager.Instance != null)
+                    {
+                        NetworkManager.Instance.HandleMessageForLocalPlayer(message);
+                    }
+                }
+                else
+                {
+                    NetworkManager.Instance.SendMessage(message, impostorID);
+                }
+            }
+        }
+
         public void StartRound()
         {
             if (_playerManager == null || _playerManager.PlayerCount < 4)
@@ -83,9 +153,6 @@ namespace Impostor.Game
             _roundInProgress = true;
             _clues.Clear();
             _currentPlayerIndex = 0;
-
-            // Get secret word
-            _currentSecretWord = WordManager.Instance.GetRandomWord();
 
             // Set up turn order - always put local player first, then randomize the rest
             _turnOrder = new List<CSteamID>(_playerManager.AllPlayers);
@@ -113,42 +180,10 @@ namespace Impostor.Game
             // Reset player states
             _playerManager.ResetRoundState();
 
-            // Distribute words to players
-            DistributeWords();
-
             OnRoundStarted?.Invoke(_currentRound, _currentSecretWord);
             Debug.Log($"Round {_currentRound} started. Secret word: {_currentSecretWord}");
         }
 
-        private void DistributeWords()
-        {
-            List<CSteamID> impostors = _playerManager.GetImpostors();
-            List<CSteamID> civilians = _playerManager.GetCivilians();
-
-            // Send word to civilians
-            foreach (CSteamID civilianID in civilians)
-            {
-                WordAssignedMessage message = new WordAssignedMessage
-                {
-                    PlayerSteamID = civilianID.m_SteamID,
-                    Word = _currentSecretWord,
-                    IsImpostor = false
-                };
-                NetworkManager.Instance.SendMessage(message, civilianID);
-            }
-
-            // Send "IMPOSTOR" to impostors
-            foreach (CSteamID impostorID in impostors)
-            {
-                WordAssignedMessage message = new WordAssignedMessage
-                {
-                    PlayerSteamID = impostorID.m_SteamID,
-                    Word = "IMPOSTOR",
-                    IsImpostor = true
-                };
-                NetworkManager.Instance.SendMessage(message, impostorID);
-            }
-        }
 
         public void SubmitClue(CSteamID playerID, string clue)
         {

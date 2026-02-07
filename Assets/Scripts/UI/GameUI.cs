@@ -41,6 +41,12 @@ namespace Impostor.UI
         [Header("Timer")]
         [SerializeField] private TextMeshProUGUI timerText;
         [SerializeField] private Slider timerSlider;
+
+        [Header("Draft Phase")]
+        [SerializeField] private GameObject draftPhasePanel;
+        [SerializeField] private TextMeshProUGUI draftWordText;
+        [SerializeField] private TextMeshProUGUI draftRoleText;
+        [SerializeField] private Button acknowledgeDraftButton;
         
         private float _clueTimer = 0f;
         private float _clueTimeLimit = 5f;
@@ -157,6 +163,15 @@ namespace Impostor.UI
 
         private void InitializeUI()
         {
+            // Auto-create draft phase UI if not assigned
+            AutoCreateDraftPhaseUI();
+
+            // Initialize draft phase UI
+            if (acknowledgeDraftButton != null)
+            {
+                acknowledgeDraftButton.onClick.AddListener(OnAcknowledgeDraft);
+            }
+
             if (submitClueButton != null)
             {
                 submitClueButton.onClick.AddListener(SubmitClue);
@@ -169,6 +184,127 @@ namespace Impostor.UI
 
             UpdateWordDisplay();
             SetClueInputEnabled(false);
+            
+            // Hide draft phase UI initially
+            ShowDraftPhaseUI(false);
+        }
+
+        private void AutoCreateDraftPhaseUI()
+        {
+            // Find or create a screen-space overlay canvas
+            Canvas screenCanvas = null;
+            Canvas[] allCanvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+            foreach (Canvas canvas in allCanvases)
+            {
+                if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                {
+                    screenCanvas = canvas;
+                    break;
+                }
+            }
+
+            // If no screen-space canvas found, create one
+            if (screenCanvas == null)
+            {
+                GameObject canvasObj = new GameObject("ScreenSpaceCanvas");
+                screenCanvas = canvasObj.AddComponent<Canvas>();
+                screenCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvasObj.AddComponent<CanvasScaler>();
+                canvasObj.AddComponent<GraphicRaycaster>();
+            }
+
+            // Create draft phase panel if not assigned
+            if (draftPhasePanel == null)
+            {
+                draftPhasePanel = new GameObject("DraftPhasePanel");
+                draftPhasePanel.transform.SetParent(screenCanvas.transform, false);
+                
+                RectTransform panelRect = draftPhasePanel.AddComponent<RectTransform>();
+                panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+                panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+                panelRect.pivot = new Vector2(0.5f, 0.5f);
+                panelRect.sizeDelta = new Vector2(600f, 400f);
+                panelRect.anchoredPosition = Vector2.zero;
+
+                // Add background image
+                UnityEngine.UI.Image bgImage = draftPhasePanel.AddComponent<UnityEngine.UI.Image>();
+                bgImage.color = new Color(0.1f, 0.1f, 0.1f, 0.95f);
+
+                // Create role text (at the top)
+                GameObject roleObj = new GameObject("DraftRoleText");
+                roleObj.transform.SetParent(draftPhasePanel.transform, false);
+                RectTransform roleRect = roleObj.AddComponent<RectTransform>();
+                roleRect.anchorMin = new Vector2(0.5f, 0.75f);
+                roleRect.anchorMax = new Vector2(0.5f, 0.75f);
+                roleRect.pivot = new Vector2(0.5f, 0.5f);
+                roleRect.sizeDelta = new Vector2(550f, 60f);
+                roleRect.anchoredPosition = Vector2.zero;
+
+                draftRoleText = roleObj.AddComponent<TextMeshProUGUI>();
+                draftRoleText.text = "You are a CIVILIAN";
+                draftRoleText.fontSize = 32f;
+                draftRoleText.color = Color.green;
+                draftRoleText.alignment = TextAlignmentOptions.Center;
+                draftRoleText.fontStyle = FontStyles.Bold;
+
+                // Create word text (prominently displayed below role)
+                GameObject wordObj = new GameObject("DraftWordText");
+                wordObj.transform.SetParent(draftPhasePanel.transform, false);
+                RectTransform wordRect = wordObj.AddComponent<RectTransform>();
+                wordRect.anchorMin = new Vector2(0.5f, 0.5f);
+                wordRect.anchorMax = new Vector2(0.5f, 0.5f);
+                wordRect.pivot = new Vector2(0.5f, 0.5f);
+                wordRect.sizeDelta = new Vector2(550f, 100f);
+                wordRect.anchoredPosition = Vector2.zero;
+
+                draftWordText = wordObj.AddComponent<TextMeshProUGUI>();
+                draftWordText.text = "WORD";
+                draftWordText.fontSize = 56f;
+                draftWordText.color = Color.white;
+                draftWordText.alignment = TextAlignmentOptions.Center;
+                draftWordText.fontStyle = FontStyles.Bold;
+
+                // Create acknowledge button
+                GameObject buttonObj = new GameObject("AcknowledgeDraftButton");
+                buttonObj.transform.SetParent(draftPhasePanel.transform, false);
+                RectTransform buttonRect = buttonObj.AddComponent<RectTransform>();
+                buttonRect.anchorMin = new Vector2(0.5f, 0.2f);
+                buttonRect.anchorMax = new Vector2(0.5f, 0.2f);
+                buttonRect.pivot = new Vector2(0.5f, 0.5f);
+                buttonRect.sizeDelta = new Vector2(300f, 60f);
+                buttonRect.anchoredPosition = Vector2.zero;
+
+                acknowledgeDraftButton = buttonObj.AddComponent<Button>();
+                
+                // Add button background
+                UnityEngine.UI.Image buttonImage = buttonObj.AddComponent<UnityEngine.UI.Image>();
+                buttonImage.color = new Color(0.2f, 0.6f, 0.2f, 1f);
+                acknowledgeDraftButton.targetGraphic = buttonImage;
+
+                // Add button text
+                GameObject buttonTextObj = new GameObject("ButtonText");
+                buttonTextObj.transform.SetParent(buttonObj.transform, false);
+                RectTransform buttonTextRect = buttonTextObj.AddComponent<RectTransform>();
+                buttonTextRect.anchorMin = Vector2.zero;
+                buttonTextRect.anchorMax = Vector2.one;
+                buttonTextRect.sizeDelta = Vector2.zero;
+                buttonTextRect.anchoredPosition = Vector2.zero;
+
+                TextMeshProUGUI buttonText = buttonTextObj.AddComponent<TextMeshProUGUI>();
+                buttonText.text = "I'm Ready";
+                buttonText.fontSize = 28f;
+                buttonText.color = Color.white;
+                buttonText.alignment = TextAlignmentOptions.Center;
+                buttonText.fontStyle = FontStyles.Bold;
+
+                Debug.Log("[GameUI] Auto-created draft phase UI elements");
+            }
+
+            // Ensure panel is initially hidden
+            if (draftPhasePanel != null)
+            {
+                draftPhasePanel.SetActive(false);
+            }
         }
 
         private void OnGameStateChanged(GameManager.GameState newState)
@@ -178,6 +314,9 @@ namespace Impostor.UI
                 case GameManager.GameState.InGame:
                     Debug.Log($"[GameUI] ========== OnGameStateChanged -> InGame (Frame: {Time.frameCount}) ==========");
                     Debug.Log($"[GameUI] Timer state BEFORE reset: Active={_clueTimerActive}, Player={_currentTimerPlayer}, Timer={_clueTimer:F2}s, Frame={_lastTimerStartFrame}, RoundStarting={_roundStarting}");
+                    
+                    // Hide draft phase UI when entering InGame
+                    ShowDraftPhaseUI(false);
                     
                     SetClueInputEnabled(IsMyTurn());
                     // CRITICAL: Reset clue timer state completely when entering InGame
@@ -233,6 +372,71 @@ namespace Impostor.UI
                         }
                     }
                     break;
+                case GameManager.GameState.DraftPhase:
+                    SetClueInputEnabled(false);
+                    // Hide other UI elements during draft phase
+                    if (timerText != null) timerText.gameObject.SetActive(false);
+                    if (timerSlider != null) timerSlider.gameObject.SetActive(false);
+                    ShowDraftPhaseUI(true);
+                    break;
+            }
+        }
+
+        private void OnEnterDraftPhase()
+        {
+            Debug.Log("[GameUI] Entered DraftPhase - showing word and role");
+            ShowDraftPhaseUI(true);
+        }
+
+        private void ShowDraftPhaseUI(bool show)
+        {
+            if (draftPhasePanel != null)
+            {
+                draftPhasePanel.SetActive(show);
+            }
+
+            if (show)
+            {
+                // Update the UI with current word/role information
+                UpdateDraftPhaseUI();
+
+                // Enable acknowledge button if not already acknowledged
+                if (acknowledgeDraftButton != null)
+                {
+                    acknowledgeDraftButton.interactable = true;
+                }
+            }
+        }
+
+        private void OnAcknowledgeDraft()
+        {
+            Debug.Log("[GameUI] Player acknowledged draft phase");
+            
+            // Disable button to prevent multiple clicks
+            if (acknowledgeDraftButton != null)
+            {
+                acknowledgeDraftButton.interactable = false;
+            }
+
+            // Send acknowledgment to host
+            DraftAcknowledgedMessage message = new DraftAcknowledgedMessage
+            {
+                PlayerSteamID = Impostor.Steam.SteamManager.Instance.LocalSteamID.m_SteamID
+            };
+
+            if (GameManager.Instance != null && GameManager.Instance.IsHost)
+            {
+                // If we're the host, handle directly
+                GameManager.Instance.OnDraftAcknowledged(Impostor.Steam.SteamManager.Instance.LocalSteamID);
+            }
+            else
+            {
+                // Send to host
+                CSteamID hostID = GameManager.Instance.GetHostSteamID();
+                if (hostID != CSteamID.Nil)
+                {
+                    NetworkManager.Instance.SendMessage(message, hostID);
+                }
             }
         }
 
@@ -466,6 +670,58 @@ namespace Impostor.UI
                     _localSecretWord = wordMsg.Word;
                     _isImpostor = wordMsg.IsImpostor;
                     UpdateWordDisplay();
+                    
+                    Debug.Log($"[GameUI] Word assigned: {_localSecretWord}, IsImpostor: {_isImpostor}");
+                    
+                    // Update draft phase UI if it's showing (or show it if we're in draft phase)
+                    if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameManager.GameState.DraftPhase)
+                    {
+                        // Force update the draft UI with the new word
+                        UpdateDraftPhaseUI();
+                    }
+                }
+            }
+        }
+        
+        private void UpdateDraftPhaseUI()
+        {
+            // Update role display
+            if (draftRoleText != null)
+            {
+                if (_isImpostor)
+                {
+                    draftRoleText.text = "You are the IMPOSTOR";
+                    draftRoleText.color = Color.red;
+                }
+                else
+                {
+                    draftRoleText.text = "You are a CIVILIAN";
+                    draftRoleText.color = Color.green;
+                }
+            }
+
+            // Update word display - show the word from the pool
+            if (draftWordText != null)
+            {
+                if (_isImpostor)
+                {
+                    draftWordText.text = "IMPOSTOR";
+                    draftWordText.color = Color.red;
+                }
+                else
+                {
+                    // Show the actual word from the pool
+                    if (string.IsNullOrEmpty(_localSecretWord))
+                    {
+                        draftWordText.text = "Waiting for word...";
+                        draftWordText.color = Color.yellow;
+                    }
+                    else
+                    {
+                        draftWordText.text = _localSecretWord;
+                        draftWordText.color = Color.white;
+                        Debug.Log($"[GameUI] Updated draft word text to: {_localSecretWord}");
+                    }
                 }
             }
         }
