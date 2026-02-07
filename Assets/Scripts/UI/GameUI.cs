@@ -17,6 +17,7 @@ namespace Impostor.UI
         [Header("Word Display")]
         [SerializeField] private TextMeshProUGUI secretWordText;
         [SerializeField] private GameObject wordPanel;
+        [SerializeField] private TextMeshProUGUI myClueText; // UI text to show local player's clue (just the clue, no name)
 
         [Header("Turn Indicator")]
         [SerializeField] private TextMeshProUGUI currentPlayerText;
@@ -586,6 +587,13 @@ namespace Impostor.UI
 
         private void ClearClues()
         {
+            // Clear local player's clue UI
+            if (myClueText != null)
+            {
+                myClueText.text = "";
+                myClueText.gameObject.SetActive(false);
+            }
+            
             // If using manual setup, just hide the text objects
             if (manualClueTexts != null && manualClueTexts.Length > 0)
             {
@@ -731,6 +739,67 @@ namespace Impostor.UI
         {
             Debug.Log($"[GameUI] CreateDialogueBox START: playerID={playerID}, clue='{clue}', playerName='{playerName}'");
             
+            // Check if this is the local player - show clue in UI instead of above head
+            CSteamID localPlayerID = Impostor.Steam.SteamManager.Instance?.LocalSteamID ?? CSteamID.Nil;
+            if (playerID == localPlayerID)
+            {
+                // For local player, show just the clue in UI (not above head)
+                if (myClueText != null)
+                {
+                    myClueText.text = clue; // Just the clue, no "Your Clue:" prefix
+                    myClueText.gameObject.SetActive(true);
+                }
+                else
+                {
+                    // Create UI text if not assigned - place it in bottom left corner of screen
+                    // Find or create a screen-space overlay canvas
+                    Canvas screenCanvas = null;
+                    Canvas[] allCanvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+                    foreach (Canvas canvas in allCanvases)
+                    {
+                        if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                        {
+                            screenCanvas = canvas;
+                            break;
+                        }
+                    }
+                    
+                    // If no screen-space canvas found, create one
+                    if (screenCanvas == null)
+                    {
+                        GameObject canvasObj = new GameObject("ScreenSpaceCanvas");
+                        screenCanvas = canvasObj.AddComponent<Canvas>();
+                        screenCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                        canvasObj.AddComponent<CanvasScaler>();
+                        canvasObj.AddComponent<GraphicRaycaster>();
+                    }
+                    
+                    GameObject clueUI = new GameObject("MyClueText");
+                    clueUI.transform.SetParent(screenCanvas.transform, false);
+                    RectTransform rect = clueUI.AddComponent<RectTransform>();
+                    
+                    // Anchor to bottom left corner
+                    rect.anchorMin = new Vector2(0f, 0f);
+                    rect.anchorMax = new Vector2(0f, 0f);
+                    rect.pivot = new Vector2(0f, 0f);
+                    rect.anchoredPosition = new Vector2(20f, 20f); // 20px from bottom left
+                    rect.sizeDelta = new Vector2(400f, 60f);
+                    
+                    TextMeshProUGUI text = clueUI.AddComponent<TextMeshProUGUI>();
+                    text.text = clue;
+                    text.fontSize = 36f;
+                    text.color = Color.yellow;
+                    text.alignment = TextAlignmentOptions.Left;
+                    text.fontStyle = FontStyles.Bold;
+                    text.enableWordWrapping = false;
+                    myClueText = text;
+                    
+                    Debug.Log($"[GameUI] Created MyClueText in bottom left corner on screen-space canvas");
+                }
+                Debug.Log($"[GameUI] Local player clue shown in UI: {clue}");
+                return; // Don't create 3D text above head for local player
+            }
+            
             // Check if using manual text setup
             if (manualClueTexts != null && manualClueTexts.Length > 0)
             {
@@ -760,25 +829,9 @@ namespace Impostor.UI
             
             Debug.Log($"[GameUI] Canvas found: {worldSpaceCanvas.name}, Scale: {worldSpaceCanvas.transform.localScale}, Camera: {worldSpaceCanvas.worldCamera?.name ?? "NULL"}");
             
-            // Get player position - check if this is the local player (camera)
+            // Get player position for other players (local player handled above)
             Vector3 boxPosition = Vector3.zero;
             bool foundPosition = false;
-            
-            // Check if this is the local player - position above camera head
-            CSteamID localPlayerID = Impostor.Steam.SteamManager.Instance?.LocalSteamID ?? CSteamID.Nil;
-            if (playerID == localPlayerID && UnityEngine.Camera.main != null)
-            {
-                // For local player, position text directly above camera (in front and above)
-                Transform cameraTransform = UnityEngine.Camera.main.transform;
-                Vector3 cameraPos = cameraTransform.position;
-                Vector3 cameraForward = cameraTransform.forward;
-                
-                // Position slightly in front of camera (0.3 units) and above (1.2 units)
-                // This ensures it's visible above your head, not behind you
-                boxPosition = cameraPos + cameraForward * 0.3f + Vector3.up * 1.2f;
-                foundPosition = true;
-                Debug.Log($"[GameUI] Local player - camera at {cameraPos}, forward: {cameraForward}, placing text at {boxPosition}");
-            }
             
             // For other players, try to find player marker
             if (!foundPosition)
@@ -934,11 +987,12 @@ namespace Impostor.UI
         {
             if (UnityEngine.Camera.main == null) return;
             
+            // Update 3D text above other players' heads (local player doesn't have 3D text)
             foreach (var kvp in _dialogueBoxes)
             {
                 if (kvp.Value == null) continue;
                 
-                // Make text face camera (simple billboard)
+                // Make text face camera (billboard effect)
                 kvp.Value.transform.LookAt(UnityEngine.Camera.main.transform);
                 kvp.Value.transform.Rotate(0f, 180f, 0f); // Flip to face camera
             }
